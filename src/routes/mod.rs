@@ -40,4 +40,5 @@ pub fn router() -> Router<AppState> {
             post(admin::reset_user_password),
         )
         .route("/admin/tunnels", get(admin::all_tunnels))
+        .route("/admin/tunnels/{id}/delete", post(admin::delete_tunnel))
 }

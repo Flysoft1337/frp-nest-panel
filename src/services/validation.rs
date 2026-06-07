@@ -49,6 +49,14 @@ pub fn local_host(value: &str) -> AppResult<String> {
     Ok(value.to_owned())
 }
 
+pub fn tunnel_protocol(value: &str) -> AppResult<String> {
+    let value = value.trim().to_ascii_lowercase();
+    if value != "tcp" && value != "udp" {
+        return Err(AppError::BadRequest("隧道协议只能是 tcp 或 udp".to_owned()));
+    }
+    Ok(value)
+}
+
 pub fn local_port(value: i32) -> AppResult<i32> {
     if !(1..=65535).contains(&value) {
         return Err(AppError::BadRequest("本地端口不合法".to_owned()));

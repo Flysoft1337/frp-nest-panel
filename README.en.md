@@ -2,14 +2,14 @@
 
 [中文](README.md)
 
-`frp-nest-panel` is a lightweight multi-user self-service panel built on top of the official frp project. It does not replace frps/frpc. Instead, it manages users, invite codes, remote port allocation, and `frpc.toml` generation so friends or team members can create TCP tunnels by themselves.
+`frp-nest-panel` is a lightweight multi-user self-service panel built on top of the official frp project. It does not replace frps/frpc. Instead, it manages users, invite codes, remote port allocation, and `frpc.toml` generation so friends or team members can create TCP/UDP tunnels by themselves.
 
 ## Features
 
 - Admin login
 - Invite-code registration
 - Enable or disable users
-- Create and delete TCP tunnels
+- Create and delete TCP/UDP tunnels
 - Automatic remote port allocation
 - Download generated `frpc.toml`
 - Admin views for users, invite codes, and all tunnels
@@ -27,9 +27,8 @@
 
 ## Current Limitations
 
-The first version only supports TCP tunnels. The following features are not implemented yet:
+The first version supports TCP/UDP tunnels. The following features are not implemented yet:
 
-- UDP tunnels
 - HTTP/HTTPS subdomain tunnels
 - Traffic statistics
 - Online status detection
@@ -132,11 +131,11 @@ No. The first version keeps frps independent. The panel only allocates ports and
 
 ### Can friends create tunnels by themselves?
 
-Yes. An admin creates invite codes, and invited users can register and create their own TCP tunnels.
+Yes. An admin creates invite codes, and invited users can register and create their own TCP/UDP tunnels.
 
-### Why TCP only?
+### Does it support HTTP/HTTPS tunnels?
 
-TCP covers many common use cases such as SSH, Minecraft, RDP, and other TCP services. HTTP/HTTPS/UDP support may be added later.
+Not yet. The current version supports TCP/UDP first. HTTP/HTTPS subdomains and custom domains may be added later.
 
 ## License
 

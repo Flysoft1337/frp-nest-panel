@@ -3,7 +3,7 @@
 {% block content %}
 <h1>全部隧道</h1>
 <table>
-  <thead><tr><th>用户 ID</th><th>名称</th><th>协议</th><th>本地</th><th>远程端口</th><th>创建时间</th></tr></thead>
+  <thead><tr><th>用户 ID</th><th>名称</th><th>协议</th><th>本地</th><th>远程端口</th><th>创建时间</th><th>操作</th></tr></thead>
   <tbody>
   {% for tunnel in tunnels %}
     <tr>
@@ -13,6 +13,11 @@
       <td>{{ tunnel.local_host }}:{{ tunnel.local_port }}</td>
       <td>{{ tunnel.remote_port }}</td>
       <td>{{ tunnel.created_at }}</td>
+      <td>
+        <form method="post" action="/admin/tunnels/{{ tunnel.id }}/delete" onsubmit="return confirm('确定删除这个隧道吗？');">
+          <button class="secondary outline" type="submit">删除</button>
+        </form>
+      </td>
     </tr>
   {% endfor %}
   </tbody>

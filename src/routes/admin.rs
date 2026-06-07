@@ -148,6 +148,15 @@ pub async fn reset_user_password(
     Ok(Redirect::to("/admin/users"))
 }
 
+pub async fn delete_tunnel(
+    State(state): State<AppState>,
+    AdminUser(_admin): AdminUser,
+    Path(id): Path<Uuid>,
+) -> AppResult<impl IntoResponse> {
+    tunnels::Entity::delete_by_id(id).exec(&state.db).await?;
+    Ok(Redirect::to("/admin/tunnels"))
+}
+
 pub async fn all_tunnels(
     State(state): State<AppState>,
     AdminUser(user): AdminUser,

@@ -2,9 +2,15 @@
 {% block title %}创建隧道 - frp-nest-panel{% endblock %}
 {% block content %}
 <section class="narrow">
-  <h1>创建 TCP 隧道</h1>
+  <h1>创建隧道</h1>
   <form method="post" action="/tunnels/new">
     <label>隧道名称<input name="name" placeholder="mc-server" required></label>
+    <label>协议
+      <select name="protocol" required>
+        <option value="tcp">TCP</option>
+        <option value="udp">UDP</option>
+      </select>
+    </label>
     <label>本地地址<input name="local_host" value="127.0.0.1" required></label>
     <label>本地端口<input name="local_port" type="number" min="1" max="65535" required></label>
     <button type="submit">创建</button>

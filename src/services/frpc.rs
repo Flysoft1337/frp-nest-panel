@@ -16,7 +16,7 @@ user = "{username}"
 
 [[proxies]]
 name = "{proxy_name}"
-type = "tcp"
+type = "{protocol}"
 localIP = "{local_host}"
 localPort = {local_port}
 remotePort = {remote_port}
@@ -26,6 +26,7 @@ remotePort = {remote_port}
         token = config.frps_auth_token,
         username = user.username,
         proxy_name = tunnel.name,
+        protocol = tunnel.protocol,
         local_host = tunnel.local_host,
         local_port = tunnel.local_port,
         remote_port = tunnel.remote_port,

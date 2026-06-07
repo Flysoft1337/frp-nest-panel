@@ -23,6 +23,7 @@ use crate::{
 #[derive(Deserialize)]
 pub struct TunnelForm {
     name: String,
+    protocol: String,
     local_host: String,
     local_port: i32,
 }
@@ -52,6 +53,7 @@ pub async fn create(
     }
 
     let name = validation::tunnel_name(&form.name)?;
+    let protocol = validation::tunnel_protocol(&form.protocol)?;
     let local_host = validation::local_host(&form.local_host)?;
     let local_port = validation::local_port(form.local_port)?;
 
@@ -67,7 +69,7 @@ pub async fn create(
             id: Set(Uuid::new_v4()),
             user_id: Set(user.id),
             name: Set(name.clone()),
-            protocol: Set("tcp".to_owned()),
+            protocol: Set(protocol.clone()),
             local_host: Set(local_host.clone()),
             local_port: Set(local_port),
             remote_port: Set(remote_port),
