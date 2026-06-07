@@ -4,8 +4,11 @@ import { onMounted, reactive, ref } from 'vue'
 import { getFrps, restartFrps, updateFrps } from '../api/admin'
 import type { FrpsStatus } from '../api/types'
 import AdminNav from '../components/AdminNav.vue'
+import AlertBox from '../components/AlertBox.vue'
 import ConfirmButton from '../components/ConfirmButton.vue'
+import FormField from '../components/FormField.vue'
 import PageHeader from '../components/PageHeader.vue'
+import StatCard from '../components/StatCard.vue'
 import StatusPill from '../components/StatusPill.vue'
 
 const status = ref<FrpsStatus | null>(null)
@@ -88,57 +91,72 @@ onMounted(async () => {
   <PageHeader eyebrow="Admin" title="frps 管理" description="编辑本机 frps 配置。保存不会自动重启。" />
   <AdminNav />
 
-  <section v-if="status" class="card p-6">
-    <div class="grid gap-4 md:grid-cols-6">
-      <div>
-        <div class="text-sm text-slate-400">状态</div>
-        <div class="mt-2"><StatusPill :tone="statusTone(status)">{{ status.display_status }}</StatusPill></div>
-      </div>
-      <div>
-        <div class="text-sm text-slate-400">版本</div>
-        <div class="mt-2 font-mono text-cyan-100">{{ status.version }}</div>
-      </div>
-      <div>
-        <div class="text-sm text-slate-400">配置文件</div>
-        <code class="mt-2 block text-cyan-100">{{ status.config_path }}</code>
-      </div>
-      <div>
-        <div class="text-sm text-slate-400">Token</div>
-        <div class="mt-2 text-white">{{ status.token_set ? '已设置' : '未设置' }}</div>
-      </div>
-      <div>
-        <div class="text-sm text-slate-400">Dashboard</div>
-        <div class="mt-2"><StatusPill :tone="status.dashboard_available ? 'success' : 'default'">{{ status.dashboard_available ? '可用' : status.dashboard_configured ? '不可用' : '未配置' }}</StatusPill></div>
-      </div>
-      <div>
-        <div class="text-sm text-slate-400">升级</div>
-        <div class="mt-2 text-white">{{ status.upgrade_supported ? '可用' : '暂未开放' }}</div>
-      </div>
+  <section v-if="status" class="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+    <div class="card p-5">
+      <div class="text-sm text-slate-400">状态</div>
+      <div class="mt-2"><StatusPill :tone="statusTone(status)">{{ status.display_status }}</StatusPill></div>
     </div>
+    <StatCard label="版本" :value="status.version" />
+    <StatCard label="配置文件" :value="status.config_path" />
+    <StatCard label="Token" :value="status.token_set ? '已设置' : '未设置'" />
+    <div class="card p-5">
+      <div class="text-sm text-slate-400">Dashboard</div>
+      <div class="mt-2"><StatusPill :tone="status.dashboard_available ? 'success' : 'default'">{{ status.dashboard_available ? '可用' : status.dashboard_configured ? '不可用' : '未配置' }}</StatusPill></div>
+    </div>
+    <StatCard label="升级" :value="status.upgrade_supported ? '可用' : '暂未开放'" />
   </section>
 
   <section class="card mt-6 p-6">
-    <p v-if="error" class="mb-4 rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{{ error }}</p>
-    <p v-if="message" class="mb-4 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">{{ message }}</p>
+    <div class="mb-4 grid gap-3">
+      <AlertBox v-if="error" tone="danger" :message="error" />
+      <AlertBox v-if="message" tone="success" :message="message" />
+    </div>
 
-    <form class="grid gap-4" @submit.prevent="save">
-      <label>frps 地址<input v-model="form.server_addr" required placeholder="example.com" /></label>
-      <label>bindPort<input v-model="form.bind_port" max="65535" min="1" required type="number" /></label>
-      <label>Token<input v-model="form.auth_token" autocomplete="new-password" placeholder="留空表示不修改" type="password" /></label>
-      <div class="grid gap-4 md:grid-cols-2">
-        <label>远程端口最小值<input v-model="form.remote_port_min" max="65535" min="1" required type="number" /></label>
-        <label>远程端口最大值<input v-model="form.remote_port_max" max="65535" min="1" required type="number" /></label>
-      </div>
-      <div class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-        <h2 class="mb-4 text-lg font-bold text-white">Dashboard 流量数据源</h2>
-        <div class="grid gap-4 md:grid-cols-2">
-          <label>Dashboard 地址<input v-model="form.dashboard_addr" placeholder="127.0.0.1" /></label>
-          <label>Dashboard 端口<input v-model="form.dashboard_port" max="65535" min="1" placeholder="留空关闭" type="number" /></label>
-          <label>Dashboard 用户<input v-model="form.dashboard_user" autocomplete="username" placeholder="admin" /></label>
-          <label>Dashboard 密码<input v-model="form.dashboard_password" autocomplete="new-password" placeholder="留空表示不修改" type="password" /></label>
+    <form class="grid gap-5" @submit.prevent="save">
+      <section class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+        <div class="mb-4 flex flex-col gap-1">
+          <h2 class="text-lg font-bold text-white">基础配置</h2>
+          <p class="text-sm text-slate-400">面板生成 frpc 配置时会使用这里的地址和 bindPort。</p>
         </div>
-        <p class="mt-3 text-sm text-slate-400">启用后 frps 会写入 webServer 配置，重启 frps 后流量统计才会可用。</p>
-      </div>
+        <div class="grid gap-4 md:grid-cols-2">
+          <FormField label="frps 地址"><input v-model="form.server_addr" required placeholder="example.com" /></FormField>
+          <FormField label="bindPort"><input v-model="form.bind_port" max="65535" min="1" required type="number" /></FormField>
+          <FormField label="Token" note="留空表示不修改"><input v-model="form.auth_token" autocomplete="new-password" placeholder="留空表示不修改" type="password" /></FormField>
+        </div>
+      </section>
+
+      <section class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+        <div class="mb-4 flex flex-col gap-1">
+          <h2 class="text-lg font-bold text-white">远程端口范围</h2>
+          <p class="text-sm text-slate-400">创建隧道时只能使用这个范围内的远程端口。</p>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2">
+          <FormField label="最小值"><input v-model="form.remote_port_min" max="65535" min="1" required type="number" /></FormField>
+          <FormField label="最大值"><input v-model="form.remote_port_max" max="65535" min="1" required type="number" /></FormField>
+        </div>
+      </section>
+
+      <section class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+        <div class="mb-4 flex flex-col gap-1">
+          <h2 class="text-lg font-bold text-white">Dashboard 流量数据源</h2>
+          <p class="text-sm text-slate-400">启用后 frps 会写入 webServer 配置，重启 frps 后流量统计才会可用。</p>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2">
+          <FormField label="Dashboard 地址"><input v-model="form.dashboard_addr" placeholder="127.0.0.1" /></FormField>
+          <FormField label="Dashboard 端口"><input v-model="form.dashboard_port" max="65535" min="1" placeholder="留空关闭" type="number" /></FormField>
+          <FormField label="Dashboard 用户"><input v-model="form.dashboard_user" autocomplete="username" placeholder="admin" /></FormField>
+          <FormField label="Dashboard 密码" note="留空表示不修改"><input v-model="form.dashboard_password" autocomplete="new-password" placeholder="留空表示不修改" type="password" /></FormField>
+        </div>
+      </section>
+
+      <section class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+        <div class="mb-4 flex flex-col gap-1">
+          <h2 class="text-lg font-bold text-white">版本升级</h2>
+          <p class="text-sm text-slate-400">当前版本 {{ status?.version || '未知' }}。升级入口会在后端白名单接入后开放。</p>
+        </div>
+        <button class="btn-secondary" disabled type="button">暂未开放</button>
+      </section>
+
       <div class="flex flex-wrap gap-3">
         <button class="btn-primary" type="submit">保存配置</button>
         <ConfirmButton class-name="btn-danger" :busy="status?.restarting" :message="status?.restarting ? 'frps 正在重启' : '重启 frps 会影响所有隧道连接，确定继续吗？'" @confirm="restart">{{ status?.restarting ? '重启中' : '重启 frps' }}</ConfirmButton>

@@ -4,9 +4,12 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { deleteTunnel, listAllTunnels } from '../api/admin'
 import type { AdminTunnelRow, PageResponse } from '../api/types'
 import AdminNav from '../components/AdminNav.vue'
+import AlertBox from '../components/AlertBox.vue'
 import ConfirmButton from '../components/ConfirmButton.vue'
 import PageHeader from '../components/PageHeader.vue'
+import PaginationBar from '../components/PaginationBar.vue'
 import StatusPill from '../components/StatusPill.vue'
+import Toolbar from '../components/Toolbar.vue'
 
 const page = ref<PageResponse<AdminTunnelRow> | null>(null)
 const q = ref('')
@@ -53,40 +56,54 @@ onMounted(async () => {
 <template>
   <PageHeader eyebrow="Admin" title="全部隧道" description="查看所有用户创建的 TCP/UDP 隧道。" />
   <AdminNav />
+
   <section class="card p-6">
-    <p v-if="error" class="mb-4 rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{{ error }}</p>
-    <p v-if="message" class="mb-4 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">{{ message }}</p>
-    <div class="mb-4 grid gap-3 md:grid-cols-[1fr_180px]">
+    <div class="mb-4 grid gap-3">
+      <AlertBox v-if="error" tone="danger" :message="error" />
+      <AlertBox v-if="message" tone="success" :message="message" />
+    </div>
+
+    <Toolbar>
       <input v-model="q" placeholder="搜索名称、本地地址、远程端口或用户名" />
       <select v-model="status">
         <option value="">全部协议</option>
         <option value="tcp">TCP</option>
         <option value="udp">UDP</option>
       </select>
+    </Toolbar>
+
+    <div class="grid gap-3">
+      <article v-for="row in page?.items || []" :key="row.tunnel.id" class="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 class="truncate text-lg font-black text-white">{{ row.tunnel.name }}</h2>
+              <StatusPill>{{ row.tunnel.protocol }}</StatusPill>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-400">
+              <span>用户 <strong class="text-slate-200">{{ row.username }}</strong></span>
+              <span>创建 {{ row.tunnel.created_at }}</span>
+            </div>
+          </div>
+
+          <div class="grid gap-3 md:grid-cols-2 xl:min-w-[28rem]">
+            <div class="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+              <div class="text-xs text-slate-500">本地服务</div>
+              <code class="mt-1 block truncate text-slate-200">{{ row.tunnel.local_host }}:{{ row.tunnel.local_port }}</code>
+            </div>
+            <div class="rounded-2xl border border-cyan-300/10 bg-cyan-300/[0.04] px-4 py-3">
+              <div class="text-xs text-slate-500">远程端口</div>
+              <code class="mt-1 block text-cyan-100">{{ row.tunnel.remote_port }}</code>
+            </div>
+          </div>
+
+          <div class="flex justify-start xl:justify-end">
+            <ConfirmButton message="确定删除这个隧道吗？" @confirm="remove(row.tunnel.id)">删除</ConfirmButton>
+          </div>
+        </div>
+      </article>
     </div>
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>用户</th><th>名称</th><th>协议</th><th>本地</th><th>远程端口</th><th>创建时间</th><th>操作</th></tr></thead>
-        <tbody>
-          <tr v-for="row in page?.items || []" :key="row.tunnel.id">
-            <td class="font-semibold text-white">{{ row.username }}</td>
-            <td class="font-semibold text-white">{{ row.tunnel.name }}</td>
-            <td><StatusPill>{{ row.tunnel.protocol }}</StatusPill></td>
-            <td><code class="text-slate-300">{{ row.tunnel.local_host }}:{{ row.tunnel.local_port }}</code></td>
-            <td><code class="text-cyan-100">{{ row.tunnel.remote_port }}</code></td>
-            <td class="text-slate-400">{{ row.tunnel.created_at }}</td>
-            <td><ConfirmButton message="确定删除这个隧道吗？" @confirm="remove(row.tunnel.id)">删除</ConfirmButton></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="mt-4 flex items-center justify-between text-sm text-slate-400">
-      <span>共 {{ page?.total || 0 }} 条</span>
-      <div class="flex items-center gap-2">
-        <button class="btn-secondary" :disabled="currentPage <= 1" @click="currentPage--; load()">上一页</button>
-        <span>{{ currentPage }} / {{ totalPages }}</span>
-        <button class="btn-secondary" :disabled="currentPage >= totalPages" @click="currentPage++; load()">下一页</button>
-      </div>
-    </div>
+
+    <PaginationBar :total="page?.total || 0" :page="currentPage" :total-pages="totalPages" @prev="currentPage--; load()" @next="currentPage++; load()" />
   </section>
 </template>

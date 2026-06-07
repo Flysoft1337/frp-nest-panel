@@ -4,9 +4,13 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { createInvites, deleteInvite, listInvites } from '../api/admin'
 import type { Invite, PageResponse } from '../api/types'
 import AdminNav from '../components/AdminNav.vue'
+import AlertBox from '../components/AlertBox.vue'
 import ConfirmButton from '../components/ConfirmButton.vue'
+import FormField from '../components/FormField.vue'
 import PageHeader from '../components/PageHeader.vue'
+import PaginationBar from '../components/PaginationBar.vue'
 import StatusPill from '../components/StatusPill.vue'
+import Toolbar from '../components/Toolbar.vue'
 
 const page = ref<PageResponse<Invite> | null>(null)
 const count = ref(1)
@@ -81,17 +85,20 @@ onMounted(async () => {
   <AdminNav />
 
   <section class="card p-6">
+    <div class="mb-4 grid gap-3">
+      <AlertBox v-if="error" tone="danger" :message="error" />
+      <AlertBox v-if="message" tone="success" :message="message" />
+    </div>
+
     <form class="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end" @submit.prevent="submit">
-      <label>生成数量<input v-model="count" max="100" min="1" required type="number" /></label>
-      <label>过期天数<input v-model="expiresDays" min="0" placeholder="0 表示永不过期" type="number" /></label>
+      <FormField label="生成数量"><input v-model="count" max="100" min="1" required type="number" /></FormField>
+      <FormField label="过期天数" note="0 或留空表示永不过期"><input v-model="expiresDays" min="0" placeholder="永不过期" type="number" /></FormField>
       <button class="btn-primary" type="submit">生成邀请码</button>
     </form>
-    <p v-if="error" class="mt-4 rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{{ error }}</p>
-    <p v-if="message" class="mt-4 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">{{ message }}</p>
   </section>
 
   <section class="card mt-6 p-6">
-    <div class="mb-4 grid gap-3 md:grid-cols-[1fr_180px]">
+    <Toolbar>
       <input v-model="q" placeholder="搜索邀请码" />
       <select v-model="status">
         <option value="">全部状态</option>
@@ -99,31 +106,30 @@ onMounted(async () => {
         <option value="used">已使用</option>
         <option value="expired">已过期</option>
       </select>
+    </Toolbar>
+
+    <div class="grid gap-3">
+      <article v-for="invite in page?.items || []" :key="invite.id" class="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <code class="break-all text-base font-bold text-cyan-100">{{ invite.code }}</code>
+              <StatusPill :tone="statusTone(invite)">{{ inviteStatus(invite) }}</StatusPill>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-400">
+              <span>过期 {{ invite.expires_at || '永不过期' }}</span>
+              <span>创建 {{ invite.created_at }}</span>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <button class="btn-secondary" type="button" @click="copy(invite.code)">复制</button>
+            <ConfirmButton v-if="!invite.used_by" message="确定作废这个邀请码吗？" @confirm="remove(invite.id)">作废</ConfirmButton>
+          </div>
+        </div>
+      </article>
     </div>
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>邀请码</th><th>状态</th><th>过期时间</th><th>创建时间</th><th>操作</th></tr></thead>
-        <tbody>
-          <tr v-for="invite in page?.items || []" :key="invite.id">
-            <td><code class="text-cyan-100">{{ invite.code }}</code></td>
-            <td><StatusPill :tone="statusTone(invite)">{{ inviteStatus(invite) }}</StatusPill></td>
-            <td class="text-slate-300">{{ invite.expires_at || '永不过期' }}</td>
-            <td class="text-slate-400">{{ invite.created_at }}</td>
-            <td class="flex gap-2">
-              <button class="btn-secondary" type="button" @click="copy(invite.code)">复制</button>
-              <ConfirmButton v-if="!invite.used_by" message="确定作废这个邀请码吗？" @confirm="remove(invite.id)">作废</ConfirmButton>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="mt-4 flex items-center justify-between text-sm text-slate-400">
-      <span>共 {{ page?.total || 0 }} 条</span>
-      <div class="flex items-center gap-2">
-        <button class="btn-secondary" :disabled="currentPage <= 1" @click="currentPage--; load()">上一页</button>
-        <span>{{ currentPage }} / {{ totalPages }}</span>
-        <button class="btn-secondary" :disabled="currentPage >= totalPages" @click="currentPage++; load()">下一页</button>
-      </div>
-    </div>
+
+    <PaginationBar :total="page?.total || 0" :page="currentPage" :total-pages="totalPages" @prev="currentPage--; load()" @next="currentPage++; load()" />
   </section>
 </template>
