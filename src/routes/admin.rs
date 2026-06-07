@@ -19,8 +19,8 @@ use crate::{
     error::{AppError, AppResult},
     routes::types::{
         AdminSummaryResponse, AdminTrafficSummaryResponse, AdminTunnelResponse,
-        AdminTunnelTrafficResponse, ConfigResponse, FrpsStatusResponse, InviteResponse, OkResponse,
-        PageResponse, PublicUser, TunnelResponse, UserRowResponse,
+        AdminTunnelTrafficResponse, ConfigResponse, FrpsStatusResponse, FrpsUpgradeResponse,
+        InviteResponse, OkResponse, PageResponse, PublicUser, TunnelResponse, UserRowResponse,
     },
     services::{frps, invite, password, validation},
     state::AppState,
@@ -61,6 +61,11 @@ pub struct FrpsUpdateForm {
     dashboard_port: Option<u16>,
     dashboard_user: String,
     dashboard_password: String,
+}
+
+#[derive(Deserialize)]
+pub struct FrpsUpgradeForm {
+    version: String,
 }
 
 pub async fn config(
@@ -416,7 +421,8 @@ pub async fn frps_status(
 ) -> AppResult<impl IntoResponse> {
     let frps = state.frps.read().await.clone();
     let restarting = state.frps_restarting.load(Ordering::SeqCst);
-    let runtime_status = frps::runtime_status(&frps, restarting).await;
+    let upgrading = state.frps_upgrading.load(Ordering::SeqCst);
+    let runtime_status = frps::runtime_status(&frps, restarting || upgrading).await;
     let dashboard_available = frps::dashboard_available(&frps).await;
     Ok(Json(FrpsStatusResponse {
         server_addr: frps.server_addr.clone(),
@@ -430,9 +436,13 @@ pub async fn frps_status(
         version: runtime_status.version,
         display_status: runtime_status.display_status,
         restarting,
+        upgrading,
         restart_command_configured: true,
-        upgrade_supported: false,
-        available_versions: Vec::new(),
+        upgrade_supported: true,
+        available_versions: frps::FRPS_AVAILABLE_VERSIONS
+            .iter()
+            .map(|version| (*version).to_owned())
+            .collect(),
         dashboard_addr: frps.dashboard_addr,
         dashboard_port: frps.dashboard_port,
         dashboard_user: frps.dashboard_user,
@@ -511,6 +521,9 @@ pub async fn restart_frps(
     State(state): State<AppState>,
     AdminUser(_user): AdminUser,
 ) -> AppResult<impl IntoResponse> {
+    if state.frps_upgrading.load(Ordering::SeqCst) {
+        return Err(AppError::BadRequest("frps 正在升级".to_owned()));
+    }
     if state
         .frps_restarting
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
@@ -528,6 +541,38 @@ pub async fn restart_frps(
     });
 
     Ok(Json(OkResponse { ok: true }))
+}
+
+pub async fn upgrade_frps(
+    State(state): State<AppState>,
+    AdminUser(_user): AdminUser,
+    Json(form): Json<FrpsUpgradeForm>,
+) -> AppResult<impl IntoResponse> {
+    let version = form.version.trim().to_owned();
+    if !frps::FRPS_AVAILABLE_VERSIONS.contains(&version.as_str()) {
+        return Err(AppError::BadRequest("frps 版本不在允许列表内".to_owned()));
+    }
+    if state.frps_restarting.load(Ordering::SeqCst) {
+        return Err(AppError::BadRequest("frps 正在重启".to_owned()));
+    }
+    if state
+        .frps_upgrading
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return Err(AppError::BadRequest("frps 正在升级".to_owned()));
+    }
+
+    let frps_config = state.frps.read().await.clone();
+    let result = frps::upgrade_frps(&frps_config, &version)
+        .await
+        .map_err(|error| AppError::BadRequest(format!("升级 frps 失败: {error}")));
+    state.frps_upgrading.store(false, Ordering::SeqCst);
+
+    Ok(Json(FrpsUpgradeResponse {
+        ok: true,
+        message: result?,
+    }))
 }
 
 async fn set_user_disabled(state: &AppState, id: Uuid, disabled: bool) -> AppResult<()> {

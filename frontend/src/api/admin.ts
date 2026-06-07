@@ -94,3 +94,10 @@ export function updateFrps(form: FrpsUpdate) {
 export function restartFrps() {
   return api<{ ok: boolean }>('/api/admin/frps/restart', { method: 'POST' })
 }
+
+export function upgradeFrps(version: string) {
+  return api<{ ok: boolean, message: string }>('/api/admin/frps/upgrade', {
+    method: 'POST',
+    json: { version },
+  })
+}

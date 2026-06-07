@@ -105,6 +105,7 @@ export interface FrpsStatus {
   version: string
   display_status: string
   restarting: boolean
+  upgrading: boolean
   restart_command_configured: boolean
   upgrade_supported: boolean
   available_versions: string[]

@@ -11,4 +11,5 @@ pub struct AppState {
     pub db: DatabaseConnection,
     pub frps: Arc<RwLock<FrpsRuntimeConfig>>,
     pub frps_restarting: Arc<AtomicBool>,
+    pub frps_upgrading: Arc<AtomicBool>,
 }

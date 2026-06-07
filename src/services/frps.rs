@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -11,6 +11,11 @@ use crate::config::Config;
 pub const FRPS_CONFIG_PATH: &str = "frps/frps.toml";
 pub const FRPS_PANEL_CONFIG_PATH: &str = "frps/panel.toml";
 pub const FRPS_IMAGE: &str = "snowdreamtech/frps:0.62.1";
+pub const FRPS_COMPOSE_PATH: &str = "docker-compose.yml";
+pub const FRPS_AVAILABLE_VERSIONS: &[&str] = &[
+    "0.69.1", "0.69.0", "0.68.1", "0.68.0", "0.67.0", "0.66.0", "0.65.0", "0.64.0", "0.63.0",
+    "0.62.1",
+];
 
 #[derive(Clone, Debug)]
 pub struct FrpsRuntimeConfig {
@@ -310,7 +315,9 @@ fn proxy_u64(proxy: &Value, keys: &[&str]) -> u64 {
 }
 
 pub async fn runtime_status(config: &FrpsRuntimeConfig, restarting: bool) -> FrpsRuntimeStatus {
-    let version = frps_version();
+    let version = current_compose_version()
+        .await
+        .unwrap_or_else(|_| frps_version());
     let state = if restarting {
         "restarting".to_owned()
     } else {
@@ -339,23 +346,103 @@ fn frps_version() -> String {
         .rsplit_once(':')
         .map(|(_, tag)| tag)
         .unwrap_or("unknown");
-    if tag.starts_with('v') || tag == "unknown" {
-        tag.to_owned()
-    } else {
-        format!("v{tag}")
-    }
+    format_version(tag)
 }
 
 pub async fn restart_frps() -> Result<()> {
+    docker_compose(&["up", "-d", "frps"], Duration::from_secs(30)).await
+}
+
+pub async fn upgrade_frps(config: &FrpsRuntimeConfig, version: &str) -> Result<String> {
+    if !FRPS_AVAILABLE_VERSIONS.contains(&version) {
+        anyhow::bail!("frps version is not allowed");
+    }
+
+    let compose = tokio::fs::read_to_string(FRPS_COMPOSE_PATH)
+        .await
+        .with_context(|| format!("failed to read {FRPS_COMPOSE_PATH}"))?;
+    let Some((image, current_version)) = find_frps_image(&compose) else {
+        anyhow::bail!("failed to find snowdreamtech/frps image in {FRPS_COMPOSE_PATH}");
+    };
+    let target_image = format!("snowdreamtech/frps:{version}");
+    let backup_path = if image != target_image {
+        let backup_path = backup_compose_path()?;
+        tokio::fs::write(&backup_path, &compose)
+            .await
+            .with_context(|| format!("failed to write {backup_path}"))?;
+        let updated = compose.replacen(&image, &target_image, 1);
+        tokio::fs::write(FRPS_COMPOSE_PATH, updated)
+            .await
+            .with_context(|| format!("failed to write {FRPS_COMPOSE_PATH}"))?;
+        Some(backup_path)
+    } else {
+        None
+    };
+
+    docker_compose(&["pull", "frps"], Duration::from_secs(180))
+        .await
+        .with_context(|| upgrade_failure_context(&backup_path))?;
+    docker_compose(&["up", "-d", "frps"], Duration::from_secs(60))
+        .await
+        .with_context(|| upgrade_failure_context(&backup_path))?;
+    wait_for_bind_port(config.bind_port)
+        .await
+        .with_context(|| upgrade_failure_context(&backup_path))?;
+
+    Ok(format!("v{current_version} -> v{version}"))
+}
+
+async fn current_compose_version() -> Result<String> {
+    let compose = tokio::fs::read_to_string(FRPS_COMPOSE_PATH)
+        .await
+        .with_context(|| format!("failed to read {FRPS_COMPOSE_PATH}"))?;
+    let Some((_, version)) = find_frps_image(&compose) else {
+        anyhow::bail!("failed to find snowdreamtech/frps image in {FRPS_COMPOSE_PATH}");
+    };
+    Ok(format_version(&version))
+}
+
+fn find_frps_image(content: &str) -> Option<(String, String)> {
+    content
+        .split_whitespace()
+        .map(|part| part.trim_matches(['\'', '"']))
+        .find(|part| part.starts_with("snowdreamtech/frps:"))
+        .map(|part| {
+            let image = part.to_owned();
+            let version = image
+                .rsplit_once(':')
+                .map(|(_, version)| version.to_owned())
+                .unwrap_or_else(|| "unknown".to_owned());
+            (image, version)
+        })
+}
+
+fn backup_compose_path() -> Result<String> {
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .context("system time is before UNIX_EPOCH")?
+        .as_secs();
+    Ok(format!("{FRPS_COMPOSE_PATH}.bak.{timestamp}"))
+}
+
+fn upgrade_failure_context(backup_path: &Option<String>) -> String {
+    backup_path
+        .as_ref()
+        .map(|path| format!("compose backup: {path}"))
+        .unwrap_or_else(|| "compose file was not changed".to_owned())
+}
+
+async fn docker_compose(args: &[&str], timeout: Duration) -> Result<()> {
     let output = tokio::time::timeout(
-        Duration::from_secs(30),
+        timeout,
         Command::new("docker")
-            .args(["compose", "up", "-d", "frps"])
+            .arg("compose")
+            .args(args)
             .current_dir(".")
             .output(),
     )
     .await
-    .context("frps restart timed out")?
+    .context("docker compose command timed out")?
     .context("failed to run docker compose")?;
 
     if !output.status.success() {
@@ -364,4 +451,28 @@ pub async fn restart_frps() -> Result<()> {
     }
 
     Ok(())
+}
+
+async fn wait_for_bind_port(bind_port: u16) -> Result<()> {
+    for _ in 0..20 {
+        if tokio::time::timeout(
+            Duration::from_secs(1),
+            TcpStream::connect(("127.0.0.1", bind_port)),
+        )
+        .await
+        .is_ok_and(|result| result.is_ok())
+        {
+            return Ok(());
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+    anyhow::bail!("frps bindPort {bind_port} did not become available");
+}
+
+fn format_version(version: &str) -> String {
+    if version.starts_with('v') || version == "unknown" {
+        version.to_owned()
+    } else {
+        format!("v{version}")
+    }
 }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 
-import { getFrps, restartFrps, updateFrps } from '../api/admin'
+import { getFrps, restartFrps, updateFrps, upgradeFrps } from '../api/admin'
 import type { FrpsStatus } from '../api/types'
 import AdminNav from '../components/AdminNav.vue'
 import AlertBox from '../components/AlertBox.vue'
@@ -23,6 +23,7 @@ const form = reactive({
   dashboard_user: '',
   dashboard_password: '',
 })
+const upgradeVersion = ref('')
 const error = ref('')
 const message = ref('')
 
@@ -38,6 +39,9 @@ async function load() {
   form.dashboard_port = data.dashboard_port
   form.dashboard_user = data.dashboard_user
   form.dashboard_password = ''
+  upgradeVersion.value = data.available_versions.includes(data.version.replace(/^v/, ''))
+    ? data.version.replace(/^v/, '')
+    : data.available_versions[0] || ''
 }
 
 async function save() {
@@ -61,6 +65,19 @@ async function restart() {
     message.value = 'frps 已重启'
   } catch (err) {
     error.value = err instanceof Error ? err.message : '重启失败'
+  }
+}
+
+async function upgrade() {
+  if (!upgradeVersion.value) return
+  error.value = ''
+  message.value = ''
+  try {
+    const result = await upgradeFrps(upgradeVersion.value)
+    await load()
+    message.value = `frps 已升级：${result.message}`
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '升级失败'
   }
 }
 
@@ -152,9 +169,21 @@ onMounted(async () => {
       <section class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
         <div class="mb-4 flex flex-col gap-1">
           <h2 class="text-lg font-bold text-white">版本升级</h2>
-          <p class="text-sm text-slate-400">当前版本 {{ status?.version || '未知' }}。升级入口会在后端白名单接入后开放。</p>
+          <p class="text-sm text-slate-400">当前版本 {{ status?.version || '未知' }}。升级会拉取新镜像并重启 frps。</p>
         </div>
-        <button class="btn-secondary" disabled type="button">暂未开放</button>
+        <div class="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
+          <FormField label="目标版本">
+            <select v-model="upgradeVersion" :disabled="!status?.upgrade_supported || status?.upgrading || status?.restarting">
+              <option v-for="version in status?.available_versions || []" :key="version" :value="version">v{{ version }}</option>
+            </select>
+          </FormField>
+          <ConfirmButton
+            class-name="btn-danger"
+            :busy="!status?.upgrade_supported || status?.upgrading || status?.restarting || !upgradeVersion"
+            :message="`升级到 v${upgradeVersion} 会重启 frps，影响所有隧道连接，确定继续吗？`"
+            @confirm="upgrade"
+          >{{ status?.upgrading ? '升级中' : '升级 frps' }}</ConfirmButton>
+        </div>
       </section>
 
       <div class="flex flex-wrap gap-3">

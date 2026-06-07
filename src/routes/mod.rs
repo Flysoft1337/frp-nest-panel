@@ -40,6 +40,7 @@ pub fn router() -> Router<AppState> {
             get(admin::frps_status).put(admin::update_frps),
         )
         .route("/api/admin/frps/restart", post(admin::restart_frps))
+        .route("/api/admin/frps/upgrade", post(admin::upgrade_frps))
         .route(
             "/api/admin/invites",
             get(admin::invites).post(admin::create_invite),
