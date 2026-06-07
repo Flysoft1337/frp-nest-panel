@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 
 import { disableUser, enableUser, listUsers, resetUserPassword, updateUserQuota } from '../api/admin'
 import type { PageResponse, UserRow } from '../api/types'
+import AdminNav from '../components/AdminNav.vue'
 import ConfirmButton from '../components/ConfirmButton.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusPill from '../components/StatusPill.vue'
@@ -85,6 +86,7 @@ onMounted(async () => {
 
 <template>
   <PageHeader eyebrow="Admin" title="用户" description="查看用户状态、隧道数量、配额和重置密码。" />
+  <AdminNav />
   <section class="card p-6">
     <p v-if="error" class="mb-4 rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{{ error }}</p>
     <p v-if="message" class="mb-4 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">{{ message }}</p>

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 
 import { createInvites, deleteInvite, listInvites } from '../api/admin'
 import type { Invite, PageResponse } from '../api/types'
+import AdminNav from '../components/AdminNav.vue'
 import ConfirmButton from '../components/ConfirmButton.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusPill from '../components/StatusPill.vue'
@@ -77,6 +78,7 @@ onMounted(async () => {
 
 <template>
   <PageHeader eyebrow="Admin" title="邀请码" description="生成注册邀请码，并查看使用状态。" />
+  <AdminNav />
 
   <section class="card p-6">
     <form class="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end" @submit.prevent="submit">

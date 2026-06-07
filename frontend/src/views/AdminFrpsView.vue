@@ -3,6 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 
 import { getFrps, restartFrps, updateFrps } from '../api/admin'
 import type { FrpsStatus } from '../api/types'
+import AdminNav from '../components/AdminNav.vue'
 import ConfirmButton from '../components/ConfirmButton.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusPill from '../components/StatusPill.vue'
@@ -85,6 +86,7 @@ onMounted(async () => {
 
 <template>
   <PageHeader eyebrow="Admin" title="frps 管理" description="编辑本机 frps 配置。保存不会自动重启。" />
+  <AdminNav />
 
   <section v-if="status" class="card p-6">
     <div class="grid gap-4 md:grid-cols-6">

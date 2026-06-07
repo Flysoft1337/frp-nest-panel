@@ -3,7 +3,10 @@ import { onMounted, ref } from 'vue'
 
 import { getAdminSummary, getAdminTrafficSummary, getConfig } from '../api/admin'
 import type { AdminSummary, AdminTrafficSummary, ConfigResponse } from '../api/types'
+import AdminNav from '../components/AdminNav.vue'
+import AlertBox from '../components/AlertBox.vue'
 import PageHeader from '../components/PageHeader.vue'
+import StatCard from '../components/StatCard.vue'
 
 const config = ref<ConfigResponse | null>(null)
 const summary = ref<AdminSummary | null>(null)
@@ -31,16 +34,17 @@ onMounted(async () => {
 
 <template>
   <PageHeader eyebrow="Admin" title="管理后台" description="管理邀请码、用户、隧道和本机 frps。" />
+  <AdminNav />
 
-  <p v-if="error" class="mb-4 rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{{ error }}</p>
+  <AlertBox v-if="error" class="mb-4" tone="danger" :message="error" />
 
   <section v-if="summary" class="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
-    <div class="card p-5"><div class="text-sm text-slate-400">用户</div><div class="mt-2 text-3xl font-black text-white">{{ summary.user_count }}</div></div>
-    <div class="card p-5"><div class="text-sm text-slate-400">禁用用户</div><div class="mt-2 text-3xl font-black text-white">{{ summary.disabled_user_count }}</div></div>
-    <div class="card p-5"><div class="text-sm text-slate-400">隧道</div><div class="mt-2 text-3xl font-black text-white">{{ summary.tunnel_count }}</div></div>
-    <div class="card p-5"><div class="text-sm text-slate-400">邀请码</div><div class="mt-2 text-3xl font-black text-white">{{ summary.invite_count }}</div></div>
-    <div class="card p-5"><div class="text-sm text-slate-400">未用邀请码</div><div class="mt-2 text-3xl font-black text-white">{{ summary.unused_invite_count }}</div></div>
-    <div class="card p-5"><div class="text-sm text-slate-400">端口占用</div><div class="mt-2 text-xl font-black text-white">{{ summary.used_remote_port_count }} / {{ summary.remote_port_capacity }}</div></div>
+    <StatCard label="用户" :value="summary.user_count" />
+    <StatCard label="禁用用户" :value="summary.disabled_user_count" />
+    <StatCard label="隧道" :value="summary.tunnel_count" />
+    <StatCard label="邀请码" :value="summary.invite_count" />
+    <StatCard label="未用邀请码" :value="summary.unused_invite_count" />
+    <StatCard label="端口占用" :value="`${summary.used_remote_port_count} / ${summary.remote_port_capacity}`" />
   </section>
 
   <section v-if="traffic" class="card mt-6 p-6">

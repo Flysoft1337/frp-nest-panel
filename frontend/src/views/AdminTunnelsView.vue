@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 
 import { deleteTunnel, listAllTunnels } from '../api/admin'
 import type { AdminTunnelRow, PageResponse } from '../api/types'
+import AdminNav from '../components/AdminNav.vue'
 import ConfirmButton from '../components/ConfirmButton.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusPill from '../components/StatusPill.vue'
@@ -51,6 +52,7 @@ onMounted(async () => {
 
 <template>
   <PageHeader eyebrow="Admin" title="全部隧道" description="查看所有用户创建的 TCP/UDP 隧道。" />
+  <AdminNav />
   <section class="card p-6">
     <p v-if="error" class="mb-4 rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{{ error }}</p>
     <p v-if="message" class="mb-4 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">{{ message }}</p>

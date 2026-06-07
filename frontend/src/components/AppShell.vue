@@ -35,6 +35,9 @@ async function signOut() {
           <RouterLink class="rounded-2xl px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white" to="/profile">用户信息</RouterLink>
           <RouterLink class="rounded-2xl px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white" to="/password">修改密码</RouterLink>
           <RouterLink v-if="session.isAdmin" class="rounded-2xl px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white" to="/admin">管理</RouterLink>
+          <RouterLink v-if="session.isAdmin" class="rounded-2xl px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white" to="/admin/users">用户</RouterLink>
+          <RouterLink v-if="session.isAdmin" class="rounded-2xl px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white" to="/admin/tunnels">隧道</RouterLink>
+          <RouterLink v-if="session.isAdmin" class="rounded-2xl px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white" to="/admin/frps">frps</RouterLink>
           <button class="btn-secondary" type="button" @click="signOut">退出</button>
         </nav>
       </header>
