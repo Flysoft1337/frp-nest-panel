@@ -56,6 +56,10 @@ pub struct FrpsUpdateForm {
     auth_token: String,
     remote_port_min: i32,
     remote_port_max: i32,
+    dashboard_addr: String,
+    dashboard_port: Option<u16>,
+    dashboard_user: String,
+    dashboard_password: String,
 }
 
 pub async fn config(
@@ -354,6 +358,7 @@ pub async fn frps_status(
     let frps = state.frps.read().await.clone();
     let restarting = state.frps_restarting.load(Ordering::SeqCst);
     let runtime_status = frps::runtime_status(&frps, restarting).await;
+    let dashboard_available = frps::dashboard_available(&frps).await;
     Ok(Json(FrpsStatusResponse {
         server_addr: frps.server_addr.clone(),
         bind_port: frps.bind_port,
@@ -369,6 +374,11 @@ pub async fn frps_status(
         restart_command_configured: true,
         upgrade_supported: false,
         available_versions: Vec::new(),
+        dashboard_addr: frps.dashboard_addr,
+        dashboard_port: frps.dashboard_port,
+        dashboard_user: frps.dashboard_user,
+        dashboard_configured: frps.dashboard_port.is_some(),
+        dashboard_available,
     }))
 }
 
@@ -396,6 +406,9 @@ pub async fn update_frps(
     if form.remote_port_min > form.remote_port_max {
         return Err(AppError::BadRequest("远程端口范围无效".to_owned()));
     }
+    if form.dashboard_port.is_some() && form.dashboard_addr.trim().is_empty() {
+        return Err(AppError::BadRequest("dashboard 地址不能为空".to_owned()));
+    }
 
     let allocated_ports = tunnels::Entity::find()
         .all(&state.db)
@@ -420,6 +433,12 @@ pub async fn update_frps(
     }
     current.remote_port_min = form.remote_port_min;
     current.remote_port_max = form.remote_port_max;
+    current.dashboard_addr = form.dashboard_addr.trim().to_owned();
+    current.dashboard_port = form.dashboard_port;
+    current.dashboard_user = form.dashboard_user.trim().to_owned();
+    if !form.dashboard_password.is_empty() {
+        current.dashboard_password = form.dashboard_password;
+    }
 
     frps::write_runtime_config(&current)
         .await

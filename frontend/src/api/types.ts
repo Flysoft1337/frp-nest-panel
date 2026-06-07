@@ -87,6 +87,11 @@ export interface FrpsStatus {
   restart_command_configured: boolean
   upgrade_supported: boolean
   available_versions: string[]
+  dashboard_addr: string
+  dashboard_port: number | null
+  dashboard_user: string
+  dashboard_configured: boolean
+  dashboard_available: boolean
 }
 
 export interface FrpsUpdate {
@@ -95,6 +100,10 @@ export interface FrpsUpdate {
   auth_token: string
   remote_port_min: number
   remote_port_max: number
+  dashboard_addr: string
+  dashboard_port: number | null
+  dashboard_user: string
+  dashboard_password: string
 }
 
 export interface ConfigResponse {

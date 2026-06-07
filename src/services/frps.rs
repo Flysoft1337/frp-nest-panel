@@ -18,6 +18,10 @@ pub struct FrpsRuntimeConfig {
     pub auth_token: String,
     pub remote_port_min: i32,
     pub remote_port_max: i32,
+    pub dashboard_addr: String,
+    pub dashboard_port: Option<u16>,
+    pub dashboard_user: String,
+    pub dashboard_password: String,
 }
 
 pub struct FrpsRuntimeStatus {
@@ -34,6 +38,14 @@ struct FrpsPanelToml<'a> {
     remote_port_min: i32,
     #[serde(rename = "remotePortMax")]
     remote_port_max: i32,
+    #[serde(rename = "dashboardAddr")]
+    dashboard_addr: &'a str,
+    #[serde(rename = "dashboardPort")]
+    dashboard_port: Option<u16>,
+    #[serde(rename = "dashboardUser")]
+    dashboard_user: &'a str,
+    #[serde(rename = "dashboardPassword")]
+    dashboard_password: &'a str,
 }
 
 #[derive(Serialize)]
@@ -41,12 +53,22 @@ struct FrpsToml<'a> {
     #[serde(rename = "bindPort")]
     bind_port: u16,
     auth: FrpsTomlAuth<'a>,
+    #[serde(rename = "webServer", skip_serializing_if = "Option::is_none")]
+    web_server: Option<FrpsTomlWebServer<'a>>,
 }
 
 #[derive(Serialize)]
 struct FrpsTomlAuth<'a> {
     method: &'a str,
     token: &'a str,
+}
+
+#[derive(Serialize)]
+struct FrpsTomlWebServer<'a> {
+    addr: &'a str,
+    port: u16,
+    user: &'a str,
+    password: &'a str,
 }
 
 pub async fn load_runtime_config(config: &Config) -> Result<FrpsRuntimeConfig> {
@@ -56,6 +78,10 @@ pub async fn load_runtime_config(config: &Config) -> Result<FrpsRuntimeConfig> {
         auth_token: config.frps_auth_token.clone(),
         remote_port_min: config.remote_port_min,
         remote_port_max: config.remote_port_max,
+        dashboard_addr: "127.0.0.1".to_owned(),
+        dashboard_port: None,
+        dashboard_user: String::new(),
+        dashboard_password: String::new(),
     };
 
     if Path::new(FRPS_CONFIG_PATH).exists() {
@@ -74,6 +100,21 @@ pub async fn load_runtime_config(config: &Config) -> Result<FrpsRuntimeConfig> {
             .and_then(toml::Value::as_str)
         {
             runtime.auth_token = token.to_owned();
+        }
+        if let Some(web_server) = value.get("webServer") {
+            if let Some(addr) = web_server.get("addr").and_then(toml::Value::as_str) {
+                runtime.dashboard_addr = addr.to_owned();
+            }
+            if let Some(port) = web_server.get("port").and_then(toml::Value::as_integer) {
+                runtime.dashboard_port =
+                    Some(u16::try_from(port).context("webServer port is invalid")?);
+            }
+            if let Some(user) = web_server.get("user").and_then(toml::Value::as_str) {
+                runtime.dashboard_user = user.to_owned();
+            }
+            if let Some(password) = web_server.get("password").and_then(toml::Value::as_str) {
+                runtime.dashboard_password = password.to_owned();
+            }
         }
     } else {
         write_frps_config(&runtime).await?;
@@ -98,6 +139,21 @@ pub async fn load_runtime_config(config: &Config) -> Result<FrpsRuntimeConfig> {
         {
             runtime.remote_port_max =
                 i32::try_from(remote_port_max).context("remotePortMax is invalid")?;
+        }
+        if let Some(dashboard_addr) = value.get("dashboardAddr").and_then(toml::Value::as_str) {
+            runtime.dashboard_addr = dashboard_addr.to_owned();
+        }
+        if let Some(dashboard_port) = value.get("dashboardPort").and_then(toml::Value::as_integer) {
+            runtime.dashboard_port =
+                Some(u16::try_from(dashboard_port).context("dashboardPort is invalid")?);
+        }
+        if let Some(dashboard_user) = value.get("dashboardUser").and_then(toml::Value::as_str) {
+            runtime.dashboard_user = dashboard_user.to_owned();
+        }
+        if let Some(dashboard_password) =
+            value.get("dashboardPassword").and_then(toml::Value::as_str)
+        {
+            runtime.dashboard_password = dashboard_password.to_owned();
         }
     } else {
         write_panel_config(&runtime).await?;
@@ -125,6 +181,12 @@ pub async fn write_frps_config(config: &FrpsRuntimeConfig) -> Result<()> {
             method: "token",
             token: &config.auth_token,
         },
+        web_server: config.dashboard_port.map(|port| FrpsTomlWebServer {
+            addr: &config.dashboard_addr,
+            port,
+            user: &config.dashboard_user,
+            password: &config.dashboard_password,
+        }),
     })?;
     tokio::fs::write(FRPS_CONFIG_PATH, content)
         .await
@@ -143,11 +205,32 @@ pub async fn write_panel_config(config: &FrpsRuntimeConfig) -> Result<()> {
         server_addr: &config.server_addr,
         remote_port_min: config.remote_port_min,
         remote_port_max: config.remote_port_max,
+        dashboard_addr: &config.dashboard_addr,
+        dashboard_port: config.dashboard_port,
+        dashboard_user: &config.dashboard_user,
+        dashboard_password: &config.dashboard_password,
     })?;
     tokio::fs::write(FRPS_PANEL_CONFIG_PATH, content)
         .await
         .with_context(|| format!("failed to write {FRPS_PANEL_CONFIG_PATH}"))?;
     Ok(())
+}
+
+pub async fn dashboard_available(config: &FrpsRuntimeConfig) -> bool {
+    let Some(port) = config.dashboard_port else {
+        return false;
+    };
+    let url = format!("http://{}:{port}/api/serverinfo", config.dashboard_addr);
+    let client = reqwest::Client::new();
+    let mut request = client.get(url).timeout(Duration::from_secs(2));
+    if !config.dashboard_user.is_empty() {
+        request = request.basic_auth(&config.dashboard_user, Some(&config.dashboard_password));
+    }
+    request
+        .send()
+        .await
+        .map(|response| response.status().is_success())
+        .unwrap_or(false)
 }
 
 pub async fn runtime_status(config: &FrpsRuntimeConfig, restarting: bool) -> FrpsRuntimeStatus {

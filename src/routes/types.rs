@@ -146,6 +146,11 @@ pub struct FrpsStatusResponse {
     pub restart_command_configured: bool,
     pub upgrade_supported: bool,
     pub available_versions: Vec<String>,
+    pub dashboard_addr: String,
+    pub dashboard_port: Option<u16>,
+    pub dashboard_user: String,
+    pub dashboard_configured: bool,
+    pub dashboard_available: bool,
 }
 
 #[derive(Serialize)]

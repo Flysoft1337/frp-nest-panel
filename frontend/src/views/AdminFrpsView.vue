@@ -14,6 +14,10 @@ const form = reactive({
   auth_token: '',
   remote_port_min: 20000,
   remote_port_max: 30000,
+  dashboard_addr: '127.0.0.1',
+  dashboard_port: null as number | null,
+  dashboard_user: '',
+  dashboard_password: '',
 })
 const error = ref('')
 const message = ref('')
@@ -26,6 +30,10 @@ async function load() {
   form.auth_token = ''
   form.remote_port_min = data.remote_port_min
   form.remote_port_max = data.remote_port_max
+  form.dashboard_addr = data.dashboard_addr
+  form.dashboard_port = data.dashboard_port
+  form.dashboard_user = data.dashboard_user
+  form.dashboard_password = ''
 }
 
 async function save() {
@@ -79,7 +87,7 @@ onMounted(async () => {
   <PageHeader eyebrow="Admin" title="frps 管理" description="编辑本机 frps 配置。保存不会自动重启。" />
 
   <section v-if="status" class="card p-6">
-    <div class="grid gap-4 md:grid-cols-5">
+    <div class="grid gap-4 md:grid-cols-6">
       <div>
         <div class="text-sm text-slate-400">状态</div>
         <div class="mt-2"><StatusPill :tone="statusTone(status)">{{ status.display_status }}</StatusPill></div>
@@ -95,6 +103,10 @@ onMounted(async () => {
       <div>
         <div class="text-sm text-slate-400">Token</div>
         <div class="mt-2 text-white">{{ status.token_set ? '已设置' : '未设置' }}</div>
+      </div>
+      <div>
+        <div class="text-sm text-slate-400">Dashboard</div>
+        <div class="mt-2"><StatusPill :tone="status.dashboard_available ? 'success' : 'default'">{{ status.dashboard_available ? '可用' : status.dashboard_configured ? '不可用' : '未配置' }}</StatusPill></div>
       </div>
       <div>
         <div class="text-sm text-slate-400">升级</div>
@@ -114,6 +126,16 @@ onMounted(async () => {
       <div class="grid gap-4 md:grid-cols-2">
         <label>远程端口最小值<input v-model="form.remote_port_min" max="65535" min="1" required type="number" /></label>
         <label>远程端口最大值<input v-model="form.remote_port_max" max="65535" min="1" required type="number" /></label>
+      </div>
+      <div class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+        <h2 class="mb-4 text-lg font-bold text-white">Dashboard 流量数据源</h2>
+        <div class="grid gap-4 md:grid-cols-2">
+          <label>Dashboard 地址<input v-model="form.dashboard_addr" placeholder="127.0.0.1" /></label>
+          <label>Dashboard 端口<input v-model="form.dashboard_port" max="65535" min="1" placeholder="留空关闭" type="number" /></label>
+          <label>Dashboard 用户<input v-model="form.dashboard_user" autocomplete="username" placeholder="admin" /></label>
+          <label>Dashboard 密码<input v-model="form.dashboard_password" autocomplete="new-password" placeholder="留空表示不修改" type="password" /></label>
+        </div>
+        <p class="mt-3 text-sm text-slate-400">启用后 frps 会写入 webServer 配置，重启 frps 后流量统计才会可用。</p>
       </div>
       <div class="flex flex-wrap gap-3">
         <button class="btn-primary" type="submit">保存配置</button>
