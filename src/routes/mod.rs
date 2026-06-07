@@ -3,9 +3,10 @@ pub mod auth;
 pub mod dashboard;
 pub mod health;
 pub mod tunnels;
+pub mod types;
 
 use axum::{
-    routing::{get, post},
+    routing::{delete, get, post},
     Router,
 };
 
@@ -13,32 +14,31 @@ use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/", get(dashboard::home))
         .route("/healthz", get(health::healthz))
-        .route("/login", get(auth::login_page).post(auth::login))
-        .route("/register", get(auth::register_page).post(auth::register))
-        .route("/logout", post(auth::logout))
+        .route("/api/session", get(auth::session))
+        .route("/api/login", post(auth::login))
+        .route("/api/register", post(auth::register))
+        .route("/api/logout", post(auth::logout))
+        .route("/api/password", post(auth::change_password))
         .route(
-            "/password",
-            get(auth::password_page).post(auth::change_password),
+            "/api/tunnels",
+            get(dashboard::tunnels).post(tunnels::create),
         )
-        .route("/dashboard", get(dashboard::dashboard))
-        .route("/tunnels/new", get(tunnels::new_page).post(tunnels::create))
-        .route("/tunnels/{id}/delete", post(tunnels::delete))
-        .route("/tunnels/{id}/frpc", get(tunnels::preview_frpc))
+        .route("/api/tunnels/{id}", delete(tunnels::delete))
+        .route("/api/tunnels/{id}/frpc", get(tunnels::preview_frpc))
         .route("/tunnels/{id}/frpc.toml", get(tunnels::download_frpc))
-        .route("/admin", get(admin::index))
+        .route("/api/admin/config", get(admin::config))
         .route(
-            "/admin/invites",
+            "/api/admin/invites",
             get(admin::invites).post(admin::create_invite),
         )
-        .route("/admin/users", get(admin::users))
-        .route("/admin/users/{id}/disable", post(admin::disable_user))
-        .route("/admin/users/{id}/enable", post(admin::enable_user))
+        .route("/api/admin/users", get(admin::users))
+        .route("/api/admin/users/{id}/disable", post(admin::disable_user))
+        .route("/api/admin/users/{id}/enable", post(admin::enable_user))
         .route(
-            "/admin/users/{id}/reset-password",
+            "/api/admin/users/{id}/reset-password",
             post(admin::reset_user_password),
         )
-        .route("/admin/tunnels", get(admin::all_tunnels))
-        .route("/admin/tunnels/{id}/delete", post(admin::delete_tunnel))
+        .route("/api/admin/tunnels", get(admin::all_tunnels))
+        .route("/api/admin/tunnels/{id}", delete(admin::delete_tunnel))
 }

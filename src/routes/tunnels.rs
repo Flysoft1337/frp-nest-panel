@@ -1,10 +1,10 @@
 use axum::{
-    extract::{Form, Path, State},
+    extract::{Path, State},
     http::{header, HeaderMap, HeaderValue},
-    response::{IntoResponse, Redirect},
+    response::IntoResponse,
+    Json,
 };
 use chrono::Utc;
-use minijinja::context;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter,
 };
@@ -15,9 +15,9 @@ use crate::{
     auth::CurrentUser,
     entities::tunnels,
     error::{AppError, AppResult},
+    routes::types::{FrpcResponse, OkResponse, TunnelResponse},
     services::{frpc, ports, validation},
     state::AppState,
-    web,
 };
 
 #[derive(Deserialize)]
@@ -28,21 +28,10 @@ pub struct TunnelForm {
     local_port: i32,
 }
 
-pub async fn new_page(
-    State(state): State<AppState>,
-    CurrentUser(user): CurrentUser,
-) -> AppResult<impl IntoResponse> {
-    web::render(
-        &state.templates,
-        "tunnel_new.html",
-        context! { user => user },
-    )
-}
-
 pub async fn create(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
-    Form(form): Form<TunnelForm>,
+    Json(form): Json<TunnelForm>,
 ) -> AppResult<impl IntoResponse> {
     let count = tunnels::Entity::find()
         .filter(tunnels::Column::UserId.eq(user.id))
@@ -79,7 +68,7 @@ pub async fn create(
         .await;
 
         match result {
-            Ok(_) => return Ok(Redirect::to("/dashboard")),
+            Ok(tunnel) => return Ok(Json(TunnelResponse::from(tunnel))),
             Err(sea_orm::DbErr::Exec(error)) if error.to_string().contains("remote_port") => {
                 continue
             }
@@ -102,7 +91,7 @@ pub async fn delete(
         return Err(AppError::Forbidden);
     }
     tunnels::Entity::delete_by_id(id).exec(&state.db).await?;
-    Ok(Redirect::to("/dashboard"))
+    Ok(Json(OkResponse { ok: true }))
 }
 
 pub async fn preview_frpc(
@@ -118,11 +107,10 @@ pub async fn preview_frpc(
     }
 
     let frpc_toml = frpc::render_frpc_toml(&state.config, &user, &tunnel);
-    web::render(
-        &state.templates,
-        "frpc_preview.html",
-        context! { user => user, tunnel => tunnel, frpc_toml => frpc_toml },
-    )
+    Ok(Json(FrpcResponse {
+        tunnel: TunnelResponse::from(tunnel),
+        frpc_toml,
+    }))
 }
 
 pub async fn download_frpc(

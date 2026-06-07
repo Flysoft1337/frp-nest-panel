@@ -1,9 +1,5 @@
-use axum::{
-    extract::{Form, Query, State},
-    response::{IntoResponse, Redirect},
-};
+use axum::{extract::State, response::IntoResponse, Json};
 use chrono::Utc;
-use minijinja::context;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
 use serde::Deserialize;
 use tower_sessions::Session;
@@ -13,20 +9,15 @@ use crate::{
     auth::{find_user_by_username, CurrentUser, SESSION_USER_ID},
     entities::{invite_codes, users},
     error::{AppError, AppResult},
+    routes::types::{OkResponse, PublicUser, SessionResponse},
     services::{password, validation},
     state::AppState,
-    web,
 };
 
 #[derive(Deserialize)]
 pub struct LoginForm {
     username: String,
     password: String,
-}
-
-#[derive(Deserialize)]
-pub struct RegisterQuery {
-    code: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -43,14 +34,16 @@ pub struct PasswordChangeForm {
     confirm_password: String,
 }
 
-pub async fn login_page(State(state): State<AppState>) -> AppResult<impl IntoResponse> {
-    web::render(&state.templates, "login.html", web::empty_context())
+pub async fn session(CurrentUser(user): CurrentUser) -> AppResult<impl IntoResponse> {
+    Ok(Json(SessionResponse {
+        user: PublicUser::from(user),
+    }))
 }
 
 pub async fn login(
     State(state): State<AppState>,
     session: Session,
-    Form(form): Form<LoginForm>,
+    Json(form): Json<LoginForm>,
 ) -> AppResult<impl IntoResponse> {
     let Some(user) = find_user_by_username(&state.db, form.username.trim()).await? else {
         return Err(AppError::BadRequest("用户名或密码错误".to_owned()));
@@ -62,24 +55,15 @@ pub async fn login(
         return Err(AppError::BadRequest("用户名或密码错误".to_owned()));
     }
     session.insert(SESSION_USER_ID, user.id).await?;
-    Ok(Redirect::to("/dashboard"))
-}
-
-pub async fn register_page(
-    State(state): State<AppState>,
-    Query(query): Query<RegisterQuery>,
-) -> AppResult<impl IntoResponse> {
-    web::render(
-        &state.templates,
-        "register.html",
-        context! { invite_code => query.code.unwrap_or_default() },
-    )
+    Ok(Json(SessionResponse {
+        user: PublicUser::from(user),
+    }))
 }
 
 pub async fn register(
     State(state): State<AppState>,
     session: Session,
-    Form(form): Form<RegisterForm>,
+    Json(form): Json<RegisterForm>,
 ) -> AppResult<impl IntoResponse> {
     let username = validation::username(&form.username)?;
     validation::password(&form.password)?;
@@ -115,26 +99,26 @@ pub async fn register(
     .insert(&state.db)
     .await?;
 
+    let user = users::Entity::find_by_id(user_id)
+        .one(&state.db)
+        .await?
+        .ok_or(AppError::NotFound)?;
+
     let mut active_invite: invite_codes::ActiveModel = invite.into();
     active_invite.used_by = Set(Some(user_id));
     active_invite.used_at = Set(Some(Utc::now().fixed_offset()));
     active_invite.update(&state.db).await?;
 
     session.insert(SESSION_USER_ID, user_id).await?;
-    Ok(Redirect::to("/dashboard"))
-}
-
-pub async fn password_page(
-    State(state): State<AppState>,
-    CurrentUser(user): CurrentUser,
-) -> AppResult<impl IntoResponse> {
-    web::render(&state.templates, "password.html", context! { user => user })
+    Ok(Json(SessionResponse {
+        user: PublicUser::from(user),
+    }))
 }
 
 pub async fn change_password(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
-    Form(form): Form<PasswordChangeForm>,
+    Json(form): Json<PasswordChangeForm>,
 ) -> AppResult<impl IntoResponse> {
     if !password::verify_password(&form.current_password, &user.password_hash)? {
         return Err(AppError::BadRequest("当前密码错误".to_owned()));
@@ -148,10 +132,10 @@ pub async fn change_password(
     active.password_hash = Set(password::hash_password(&form.new_password)?);
     active.update(&state.db).await?;
 
-    Ok(Redirect::to("/dashboard"))
+    Ok(Json(OkResponse { ok: true }))
 }
 
 pub async fn logout(session: Session) -> AppResult<impl IntoResponse> {
     session.remove::<Uuid>(SESSION_USER_ID).await?;
-    Ok(Redirect::to("/login"))
+    Ok(Json(OkResponse { ok: true }))
 }

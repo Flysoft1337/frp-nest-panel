@@ -1,4 +1,7 @@
 /target
+/frontend/dist
+/frontend/node_modules
+/frontend/.vscode
 .env
 *.db
 *.sqlite

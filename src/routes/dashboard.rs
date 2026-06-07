@@ -1,17 +1,12 @@
-use axum::{
-    extract::State,
-    response::{IntoResponse, Redirect},
-};
-use minijinja::context;
+use axum::{extract::State, response::IntoResponse, Json};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
-use crate::{auth::CurrentUser, entities::tunnels, error::AppResult, state::AppState, web};
+use crate::{
+    auth::CurrentUser, entities::tunnels, error::AppResult, routes::types::TunnelResponse,
+    state::AppState,
+};
 
-pub async fn home() -> impl IntoResponse {
-    Redirect::to("/login")
-}
-
-pub async fn dashboard(
+pub async fn tunnels(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
 ) -> AppResult<impl IntoResponse> {
@@ -19,11 +14,10 @@ pub async fn dashboard(
         .filter(tunnels::Column::UserId.eq(user.id))
         .order_by_asc(tunnels::Column::CreatedAt)
         .all(&state.db)
-        .await?;
+        .await?
+        .into_iter()
+        .map(TunnelResponse::from)
+        .collect::<Vec<_>>();
 
-    web::render(
-        &state.templates,
-        "dashboard.html",
-        context! { user => user, tunnels => tunnels },
-    )
+    Ok(Json(tunnels))
 }

@@ -21,8 +21,9 @@
 - Axum
 - SeaORM
 - PostgreSQL
-- MiniJinja
-- Pico.css
+- Vue 3
+- Vite
+- Tailwind CSS
 - Official frps/frpc
 
 ## Current Limitations
@@ -67,16 +68,23 @@ http://127.0.0.1:8080
 
 ## Binary Deployment
 
-Build on a build machine:
+The build machine needs Node.js 20.19+ or 22.12+, plus Rust stable.
+
+Build frontend and backend on a build machine:
 
 ```bash
+cd frontend
+npm ci
+npm run build
+cd ..
 cargo build --release
 ```
 
-Copy the binary to your server:
+Copy the binary and frontend build output to your server:
 
 ```bash
 scp target/release/frp-nest-panel root@your-server:/opt/frp-nest-panel/frp-nest-panel
+scp -r frontend/dist root@your-server:/opt/frp-nest-panel/frontend/dist
 ```
 
 Prepare `.env`, then run the binary with systemd or your preferred process manager.
@@ -89,7 +97,8 @@ To build on Proxmox VE:
 apt update && apt install -y build-essential pkg-config libssl-dev git curl ca-certificates
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source ~/.cargo/env
-cargo build --release
+cd frontend && npm ci && npm run build
+cd .. && cargo build --release
 ```
 
 If your network is slow, configure a Cargo or rustup mirror/proxy.

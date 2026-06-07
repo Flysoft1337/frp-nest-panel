@@ -21,8 +21,9 @@
 - Axum
 - SeaORM
 - PostgreSQL
-- MiniJinja
-- Pico.css
+- Vue 3
+- Vite
+- Tailwind CSS
 - 官方 frps/frpc
 
 ## 当前限制
@@ -67,16 +68,23 @@ http://127.0.0.1:8080
 
 ## 二进制部署
 
-在构建机上编译：
+构建机需要 Node.js 20.19+ 或 22.12+，以及 Rust stable。
+
+在构建机上编译前端和后端：
 
 ```bash
+cd frontend
+npm ci
+npm run build
+cd ..
 cargo build --release
 ```
 
-复制二进制到服务器：
+复制二进制和前端产物到服务器：
 
 ```bash
 scp target/release/frp-nest-panel root@your-server:/opt/frp-nest-panel/frp-nest-panel
+scp -r frontend/dist root@your-server:/opt/frp-nest-panel/frontend/dist
 ```
 
 准备 `.env` 后，用 systemd 或你自己的进程管理工具运行。
@@ -89,7 +97,8 @@ scp target/release/frp-nest-panel root@your-server:/opt/frp-nest-panel/frp-nest-
 apt update && apt install -y build-essential pkg-config libssl-dev git curl ca-certificates
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source ~/.cargo/env
-cargo build --release
+cd frontend && npm ci && npm run build
+cd .. && cargo build --release
 ```
 
 国内网络环境下可以给 Cargo 或 rustup 配置代理/镜像。

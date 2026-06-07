@@ -4,16 +4,17 @@ mod entities;
 mod error;
 mod routes;
 mod services;
+mod spa;
 mod state;
-mod web;
 
-use std::sync::Arc;
-
-use axum::Router;
+use axum::{routing::get, Router};
 use migration::{Migrator, MigratorTrait};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, Database, EntityTrait};
 use tokio::net::TcpListener;
-use tower_http::{services::ServeDir, trace::TraceLayer};
+use tower_http::{
+    services::{ServeDir, ServeFile},
+    trace::TraceLayer,
+};
 use tower_sessions::cookie::{time::Duration, Key};
 use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -39,7 +40,6 @@ async fn main() -> anyhow::Result<()> {
     let state = AppState {
         config: config.clone(),
         db,
-        templates: Arc::new(web::load_templates()),
     };
 
     let mut key_bytes = [0_u8; 64];
@@ -54,7 +54,10 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .merge(routes::router())
-        .nest_service("/static", ServeDir::new("src/static"))
+        .nest_service("/assets", ServeDir::new("frontend/dist/assets"))
+        .route_service("/icons.svg", ServeFile::new("frontend/dist/icons.svg"))
+        .route_service("/favicon.svg", ServeFile::new("frontend/dist/favicon.svg"))
+        .fallback(get(spa::index))
         .layer(session_layer)
         .layer(TraceLayer::new_for_http())
         .with_state(state);
