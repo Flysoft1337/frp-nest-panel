@@ -105,6 +105,7 @@ async fn ensure_initial_admin(
         role: Set("admin".to_owned()),
         disabled: Set(false),
         created_at: Set(chrono::Utc::now().fixed_offset()),
+        max_tunnels: Set(None),
     }
     .insert(db)
     .await?;

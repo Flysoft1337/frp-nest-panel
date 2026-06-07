@@ -95,6 +95,7 @@ pub async fn register(
         role: Set("user".to_owned()),
         disabled: Set(false),
         created_at: Set(Utc::now().fixed_offset()),
+        max_tunnels: Set(None),
     }
     .insert(&state.db)
     .await?;

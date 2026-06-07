@@ -24,6 +24,7 @@ pub struct PublicUser {
     pub role: String,
     pub disabled: bool,
     pub created_at: DateTime<FixedOffset>,
+    pub max_tunnels: Option<i32>,
 }
 
 impl From<users::Model> for PublicUser {
@@ -34,6 +35,7 @@ impl From<users::Model> for PublicUser {
             role: user.role,
             disabled: user.disabled,
             created_at: user.created_at,
+            max_tunnels: user.max_tunnels,
         }
     }
 }
@@ -100,6 +102,7 @@ impl From<invite_codes::Model> for InviteResponse {
 pub struct UserRowResponse {
     pub user: PublicUser,
     pub tunnel_count: u64,
+    pub effective_max_tunnels: u64,
 }
 
 #[derive(Serialize)]

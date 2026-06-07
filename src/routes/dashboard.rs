@@ -33,7 +33,10 @@ pub async fn summary(
         .filter(tunnels::Column::UserId.eq(user.id))
         .count(&state.db)
         .await?;
-    let user_max_tunnels = state.config.user_max_tunnels;
+    let user_max_tunnels = user
+        .max_tunnels
+        .and_then(|value| u64::try_from(value).ok())
+        .unwrap_or(state.config.user_max_tunnels);
     let frps = state.frps.read().await;
 
     Ok(Json(DashboardSummaryResponse {

@@ -52,4 +52,5 @@ pub enum Users {
     Role,
     Disabled,
     CreatedAt,
+    MaxTunnels,
 }

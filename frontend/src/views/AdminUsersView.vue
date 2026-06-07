@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 
-import { disableUser, enableUser, listUsers, resetUserPassword } from '../api/admin'
+import { disableUser, enableUser, listUsers, resetUserPassword, updateUserQuota } from '../api/admin'
 import type { PageResponse, UserRow } from '../api/types'
 import ConfirmButton from '../components/ConfirmButton.vue'
 import PageHeader from '../components/PageHeader.vue'
@@ -11,6 +11,7 @@ import { useSessionStore } from '../stores/session'
 const session = useSessionStore()
 const page = ref<PageResponse<UserRow> | null>(null)
 const passwords = reactive<Record<string, string>>({})
+const quotas = reactive<Record<string, number | null>>({})
 const q = ref('')
 const status = ref('')
 const currentPage = ref(1)
@@ -24,6 +25,9 @@ const totalPages = computed(() => {
 
 async function load() {
   page.value = await listUsers({ q: q.value, status: status.value, page: currentPage.value })
+  for (const row of page.value.items) {
+    quotas[row.user.id] = row.user.max_tunnels
+  }
 }
 
 async function toggle(id: string, disabled: boolean) {
@@ -53,6 +57,18 @@ async function reset(id: string) {
   }
 }
 
+async function saveQuota(id: string) {
+  error.value = ''
+  message.value = ''
+  try {
+    await updateUserQuota(id, quotas[id] || null)
+    await load()
+    message.value = '隧道配额已更新'
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '更新配额失败'
+  }
+}
+
 watch([q, status], () => {
   currentPage.value = 1
   load().catch((err) => { error.value = err instanceof Error ? err.message : '加载失败' })
@@ -68,7 +84,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <PageHeader eyebrow="Admin" title="用户" description="查看用户状态、隧道数量和重置密码。" />
+  <PageHeader eyebrow="Admin" title="用户" description="查看用户状态、隧道数量、配额和重置密码。" />
   <section class="card p-6">
     <p v-if="error" class="mb-4 rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{{ error }}</p>
     <p v-if="message" class="mb-4 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">{{ message }}</p>
@@ -82,13 +98,20 @@ onMounted(async () => {
     </div>
     <div class="table-wrap">
       <table class="data-table">
-        <thead><tr><th>用户名</th><th>角色</th><th>状态</th><th>隧道数</th><th>创建时间</th><th>操作</th><th>重置密码</th></tr></thead>
+        <thead><tr><th>用户名</th><th>角色</th><th>状态</th><th>隧道数</th><th>配额</th><th>创建时间</th><th>操作</th><th>重置密码</th></tr></thead>
         <tbody>
           <tr v-for="row in page?.items || []" :key="row.user.id">
             <td class="font-semibold text-white">{{ row.user.username }}</td>
             <td><StatusPill>{{ row.user.role }}</StatusPill></td>
             <td><StatusPill :tone="row.user.disabled ? 'danger' : 'success'">{{ row.user.disabled ? '已禁用' : '正常' }}</StatusPill></td>
             <td><code class="text-cyan-100">{{ row.tunnel_count }}</code></td>
+            <td>
+              <form class="flex min-w-52 gap-2" @submit.prevent="saveQuota(row.user.id)">
+                <input v-model="quotas[row.user.id]" min="1" placeholder="默认" type="number" />
+                <button class="btn-secondary" type="submit">保存</button>
+              </form>
+              <div class="mt-1 text-xs text-slate-500">当前有效：{{ row.effective_max_tunnels }}</div>
+            </td>
             <td class="text-slate-400">{{ row.user.created_at }}</td>
             <td>
               <ConfirmButton v-if="row.user.id !== session.user?.id" :message="row.user.disabled ? '确定启用这个用户吗？' : '确定禁用这个用户吗？'" :class-name="row.user.disabled ? 'btn-secondary' : 'btn-danger'" @confirm="toggle(row.user.id, row.user.disabled)">{{ row.user.disabled ? '启用' : '禁用' }}</ConfirmButton>

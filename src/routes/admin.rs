@@ -36,6 +36,11 @@ pub struct ResetPasswordForm {
     new_password: String,
 }
 
+#[derive(Deserialize)]
+pub struct UserQuotaForm {
+    max_tunnels: Option<i32>,
+}
+
 #[derive(Deserialize, Default)]
 pub struct ListQuery {
     q: Option<String>,
@@ -209,9 +214,11 @@ pub async fn users(
             .filter(tunnels::Column::UserId.eq(item.id))
             .count(&state.db)
             .await?;
+        let effective_max_tunnels = effective_max_tunnels(&item, state.config.user_max_tunnels);
         user_rows.push(UserRowResponse {
             user: PublicUser::from(item),
             tunnel_count,
+            effective_max_tunnels,
         });
     }
     Ok(Json(page_response(user_rows, &query)))
@@ -250,6 +257,36 @@ pub async fn reset_user_password(
     };
     let mut active: users::ActiveModel = user.into();
     active.password_hash = Set(password::hash_password(&form.new_password)?);
+    active.update(&state.db).await?;
+    Ok(Json(OkResponse { ok: true }))
+}
+
+pub async fn update_user_quota(
+    State(state): State<AppState>,
+    AdminUser(_admin): AdminUser,
+    Path(id): Path<Uuid>,
+    Json(form): Json<UserQuotaForm>,
+) -> AppResult<impl IntoResponse> {
+    if let Some(max_tunnels) = form.max_tunnels {
+        if max_tunnels <= 0 {
+            return Err(AppError::BadRequest("用户隧道配额必须大于 0".to_owned()));
+        }
+        let tunnel_count = tunnels::Entity::find()
+            .filter(tunnels::Column::UserId.eq(id))
+            .count(&state.db)
+            .await?;
+        if (max_tunnels as u64) < tunnel_count {
+            return Err(AppError::BadRequest(
+                "用户隧道配额不能小于当前隧道数".to_owned(),
+            ));
+        }
+    }
+
+    let Some(user) = users::Entity::find_by_id(id).one(&state.db).await? else {
+        return Err(AppError::NotFound);
+    };
+    let mut active: users::ActiveModel = user.into();
+    active.max_tunnels = Set(form.max_tunnels);
     active.update(&state.db).await?;
     Ok(Json(OkResponse { ok: true }))
 }
@@ -423,6 +460,12 @@ async fn set_user_disabled(state: &AppState, id: Uuid, disabled: bool) -> AppRes
     active.disabled = Set(disabled);
     active.update(&state.db).await?;
     Ok(())
+}
+
+fn effective_max_tunnels(user: &users::Model, default_max_tunnels: u64) -> u64 {
+    user.max_tunnels
+        .and_then(|value| u64::try_from(value).ok())
+        .unwrap_or(default_max_tunnels)
 }
 
 fn normalized_query(q: &Option<String>) -> Option<String> {

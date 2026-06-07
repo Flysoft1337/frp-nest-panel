@@ -63,6 +63,13 @@ export function resetUserPassword(id: string, newPassword: string) {
   })
 }
 
+export function updateUserQuota(id: string, maxTunnels: number | null) {
+  return api<{ ok: boolean }>(`/api/admin/users/${id}/quota`, {
+    method: 'POST',
+    json: { max_tunnels: maxTunnels },
+  })
+}
+
 export function listAllTunnels(params?: ListParams) {
   return api<PageResponse<AdminTunnelRow>>(withParams('/api/admin/tunnels', params))
 }

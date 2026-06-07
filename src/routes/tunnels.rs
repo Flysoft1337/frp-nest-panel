@@ -37,7 +37,11 @@ pub async fn create(
         .filter(tunnels::Column::UserId.eq(user.id))
         .count(&state.db)
         .await?;
-    if count >= state.config.user_max_tunnels {
+    let user_max_tunnels = user
+        .max_tunnels
+        .and_then(|value| u64::try_from(value).ok())
+        .unwrap_or(state.config.user_max_tunnels);
+    if count >= user_max_tunnels {
         return Err(AppError::BadRequest("隧道数量已达上限".to_owned()));
     }
 

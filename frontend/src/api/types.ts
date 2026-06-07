@@ -4,6 +4,7 @@ export interface PublicUser {
   role: 'admin' | 'user' | string
   disabled: boolean
   created_at: string
+  max_tunnels: number | null
 }
 
 export interface SessionResponse {
@@ -39,6 +40,7 @@ export interface Invite {
 export interface UserRow {
   user: PublicUser
   tunnel_count: number
+  effective_max_tunnels: number
 }
 
 export interface AdminTunnelRow {

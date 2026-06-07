@@ -12,6 +12,7 @@ pub struct Model {
     pub role: String,
     pub disabled: bool,
     pub created_at: DateTimeWithTimeZone,
+    pub max_tunnels: Option<i32>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
