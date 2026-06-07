@@ -384,7 +384,7 @@ pub async fn update_frps(
     current.remote_port_min = form.remote_port_min;
     current.remote_port_max = form.remote_port_max;
 
-    frps::write_frps_config(&current)
+    frps::write_runtime_config(&current)
         .await
         .map_err(|error| AppError::BadRequest(format!("保存 frps 配置失败: {error}")))?;
     *state.frps.write().await = current;
