@@ -79,17 +79,43 @@ pub async fn create(
     Err(AppError::BadRequest("远程端口分配冲突，请重试".to_owned()))
 }
 
+pub async fn get(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(id): Path<Uuid>,
+) -> AppResult<impl IntoResponse> {
+    let tunnel = get_owned_tunnel(&state, user.id, id).await?;
+    Ok(Json(TunnelResponse::from(tunnel)))
+}
+
+pub async fn update(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(id): Path<Uuid>,
+    Json(form): Json<TunnelForm>,
+) -> AppResult<impl IntoResponse> {
+    let tunnel = get_owned_tunnel(&state, user.id, id).await?;
+    let name = validation::tunnel_name(&form.name)?;
+    let protocol = validation::tunnel_protocol(&form.protocol)?;
+    let local_host = validation::local_host(&form.local_host)?;
+    let local_port = validation::local_port(form.local_port)?;
+
+    let mut active: tunnels::ActiveModel = tunnel.into();
+    active.name = Set(name);
+    active.protocol = Set(protocol);
+    active.local_host = Set(local_host);
+    active.local_port = Set(local_port);
+    let tunnel = active.update(&state.db).await?;
+
+    Ok(Json(TunnelResponse::from(tunnel)))
+}
+
 pub async fn delete(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
     Path(id): Path<Uuid>,
 ) -> AppResult<impl IntoResponse> {
-    let Some(tunnel) = tunnels::Entity::find_by_id(id).one(&state.db).await? else {
-        return Err(AppError::NotFound);
-    };
-    if tunnel.user_id != user.id {
-        return Err(AppError::Forbidden);
-    }
+    get_owned_tunnel(&state, user.id, id).await?;
     tunnels::Entity::delete_by_id(id).exec(&state.db).await?;
     Ok(Json(OkResponse { ok: true }))
 }
@@ -99,12 +125,7 @@ pub async fn preview_frpc(
     CurrentUser(user): CurrentUser,
     Path(id): Path<Uuid>,
 ) -> AppResult<impl IntoResponse> {
-    let Some(tunnel) = tunnels::Entity::find_by_id(id).one(&state.db).await? else {
-        return Err(AppError::NotFound);
-    };
-    if tunnel.user_id != user.id {
-        return Err(AppError::Forbidden);
-    }
+    let tunnel = get_owned_tunnel(&state, user.id, id).await?;
 
     let frpc_toml = frpc::render_frpc_toml(&state.config, &user, &tunnel);
     Ok(Json(FrpcResponse {
@@ -118,12 +139,7 @@ pub async fn download_frpc(
     CurrentUser(user): CurrentUser,
     Path(id): Path<Uuid>,
 ) -> AppResult<impl IntoResponse> {
-    let Some(tunnel) = tunnels::Entity::find_by_id(id).one(&state.db).await? else {
-        return Err(AppError::NotFound);
-    };
-    if tunnel.user_id != user.id {
-        return Err(AppError::Forbidden);
-    }
+    let tunnel = get_owned_tunnel(&state, user.id, id).await?;
 
     let body = frpc::render_frpc_toml(&state.config, &user, &tunnel);
     let mut headers = HeaderMap::new();
@@ -136,4 +152,21 @@ pub async fn download_frpc(
         HeaderValue::from_static("attachment; filename=frpc.toml"),
     );
     Ok((headers, body))
+}
+
+async fn get_owned_tunnel(
+    state: &AppState,
+    user_id: Uuid,
+    tunnel_id: Uuid,
+) -> AppResult<tunnels::Model> {
+    let Some(tunnel) = tunnels::Entity::find_by_id(tunnel_id)
+        .one(&state.db)
+        .await?
+    else {
+        return Err(AppError::NotFound);
+    };
+    if tunnel.user_id != user_id {
+        return Err(AppError::Forbidden);
+    }
+    Ok(tunnel)
 }

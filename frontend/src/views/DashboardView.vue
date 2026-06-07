@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
+import { getDashboardSummary } from '../api/dashboard'
 import { deleteTunnel, listTunnels } from '../api/tunnels'
-import type { Tunnel } from '../api/types'
+import type { DashboardSummary, Tunnel } from '../api/types'
 import ConfirmButton from '../components/ConfirmButton.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusPill from '../components/StatusPill.vue'
 
 const tunnels = ref<Tunnel[]>([])
+const summary = ref<DashboardSummary | null>(null)
 const loading = ref(true)
 const error = ref('')
 
@@ -15,7 +17,12 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    tunnels.value = await listTunnels()
+    const [tunnelList, dashboardSummary] = await Promise.all([
+      listTunnels(),
+      getDashboardSummary(),
+    ])
+    tunnels.value = tunnelList
+    summary.value = dashboardSummary
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载失败'
   } finally {
@@ -36,10 +43,30 @@ onMounted(load)
     <RouterLink class="btn-primary" role="button" to="/tunnels/new">创建隧道</RouterLink>
   </PageHeader>
 
+  <section v-if="summary" class="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div class="card p-5">
+      <p class="text-sm text-slate-400">隧道配额</p>
+      <div class="mt-2 text-2xl font-black text-white">{{ summary.tunnel_count }} / {{ summary.user_max_tunnels }}</div>
+    </div>
+    <div class="card p-5">
+      <p class="text-sm text-slate-400">剩余可创建</p>
+      <div class="mt-2 text-2xl font-black" :class="summary.remaining_tunnels > 0 ? 'text-emerald-200' : 'text-red-200'">{{ summary.remaining_tunnels }}</div>
+    </div>
+    <div class="card p-5">
+      <p class="text-sm text-slate-400">frps 地址</p>
+      <div class="mt-2 break-all font-mono text-lg font-bold text-cyan-100">{{ summary.frps_server_addr }}:{{ summary.frps_bind_port }}</div>
+    </div>
+    <div class="card p-5">
+      <p class="text-sm text-slate-400">远程端口范围</p>
+      <div class="mt-2 font-mono text-lg font-bold text-cyan-100">{{ summary.remote_port_min }}-{{ summary.remote_port_max }}</div>
+    </div>
+  </section>
+
   <section class="card p-6">
     <div class="mb-5 flex flex-wrap items-center gap-3">
       <span class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300">{{ tunnels.length }} 个隧道</span>
       <span v-if="loading" class="text-sm text-slate-500">加载中</span>
+      <span v-if="summary?.remaining_tunnels === 0" class="rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-2 text-sm text-amber-100">隧道数量已达上限</span>
       <span v-if="error" class="text-sm text-red-200">{{ error }}</span>
     </div>
 
@@ -60,6 +87,7 @@ onMounted(load)
             <td><code class="text-cyan-100">{{ tunnel.remote_port }}</code></td>
             <td>
               <div class="flex flex-wrap items-center gap-2">
+                <RouterLink class="btn-secondary" role="button" :to="`/tunnels/${tunnel.id}/edit`">编辑</RouterLink>
                 <RouterLink class="btn-secondary" role="button" :to="`/tunnels/${tunnel.id}/frpc`">预览</RouterLink>
                 <a class="btn-secondary" role="button" :href="`/tunnels/${tunnel.id}/frpc.toml`">下载</a>
                 <ConfirmButton message="确定删除这个隧道吗？" @confirm="remove(tunnel.id)">删除</ConfirmButton>

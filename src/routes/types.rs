@@ -111,6 +111,17 @@ pub struct ConfigResponse {
     pub user_max_tunnels: u64,
 }
 
+#[derive(Serialize)]
+pub struct DashboardSummaryResponse {
+    pub tunnel_count: u64,
+    pub user_max_tunnels: u64,
+    pub remaining_tunnels: u64,
+    pub frps_server_addr: String,
+    pub frps_bind_port: u16,
+    pub remote_port_min: i32,
+    pub remote_port_max: i32,
+}
+
 impl From<&Config> for ConfigResponse {
     fn from(config: &Config) -> Self {
         Self {

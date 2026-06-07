@@ -10,6 +10,7 @@ const router = createRouter({
     { path: '/register', component: () => import('../views/RegisterView.vue'), meta: { public: true } },
     { path: '/dashboard', component: () => import('../views/DashboardView.vue') },
     { path: '/tunnels/new', component: () => import('../views/TunnelCreateView.vue') },
+    { path: '/tunnels/:id/edit', component: () => import('../views/TunnelCreateView.vue') },
     { path: '/tunnels/:id/frpc', component: () => import('../views/FrpcPreviewView.vue') },
     { path: '/password', component: () => import('../views/PasswordView.vue') },
     { path: '/admin', component: () => import('../views/AdminHomeView.vue'), meta: { admin: true } },

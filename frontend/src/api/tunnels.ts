@@ -19,6 +19,17 @@ export function createTunnel(input: TunnelInput) {
   })
 }
 
+export function getTunnel(id: string) {
+  return api<Tunnel>(`/api/tunnels/${id}`)
+}
+
+export function updateTunnel(id: string, input: TunnelInput) {
+  return api<Tunnel>(`/api/tunnels/${id}`, {
+    method: 'PATCH',
+    json: input,
+  })
+}
+
 export function deleteTunnel(id: string) {
   return api<{ ok: boolean }>(`/api/tunnels/${id}`, { method: 'DELETE' })
 }

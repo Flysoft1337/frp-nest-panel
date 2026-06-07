@@ -48,3 +48,13 @@ export interface ConfigResponse {
   remote_port_max: number
   user_max_tunnels: number
 }
+
+export interface DashboardSummary {
+  tunnel_count: number
+  user_max_tunnels: number
+  remaining_tunnels: number
+  frps_server_addr: string
+  frps_bind_port: number
+  remote_port_min: number
+  remote_port_max: number
+}

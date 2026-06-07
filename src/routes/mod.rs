@@ -20,11 +20,17 @@ pub fn router() -> Router<AppState> {
         .route("/api/register", post(auth::register))
         .route("/api/logout", post(auth::logout))
         .route("/api/password", post(auth::change_password))
+        .route("/api/dashboard/summary", get(dashboard::summary))
         .route(
             "/api/tunnels",
             get(dashboard::tunnels).post(tunnels::create),
         )
-        .route("/api/tunnels/{id}", delete(tunnels::delete))
+        .route(
+            "/api/tunnels/{id}",
+            get(tunnels::get)
+                .patch(tunnels::update)
+                .delete(tunnels::delete),
+        )
         .route("/api/tunnels/{id}/frpc", get(tunnels::preview_frpc))
         .route("/tunnels/{id}/frpc.toml", get(tunnels::download_frpc))
         .route("/api/admin/config", get(admin::config))
