@@ -1,19 +1,25 @@
 {% extends "base.html" %}
 {% block title %}管理 - frp-nest-panel{% endblock %}
 {% block content %}
-<h1>管理后台</h1>
-<div class="grid">
-  <a role="button" href="/admin/invites">邀请码</a>
-  <a role="button" href="/admin/users">用户</a>
-  <a role="button" href="/admin/tunnels">全部隧道</a>
-</div>
+<header class="page-header">
+  <p class="eyebrow">Admin</p>
+  <h1>管理后台</h1>
+</header>
 
-<article>
+<section class="panel-card">
+  <div class="admin-links grid">
+    <a role="button" href="/admin/invites">邀请码</a>
+    <a role="button" href="/admin/users">用户</a>
+    <a role="button" href="/admin/tunnels">全部隧道</a>
+  </div>
+</section>
+
+<section class="panel-card">
   <h2>当前配置</h2>
-  <ul>
-    <li>frps 地址：<code>{{ config.frps_server_addr }}:{{ config.frps_bind_port }}</code></li>
-    <li>远程端口范围：<code>{{ config.remote_port_min }}-{{ config.remote_port_max }}</code></li>
-    <li>每个用户最多隧道数：<code>{{ config.user_max_tunnels }}</code></li>
+  <ul class="config-list">
+    <li><span>frps 地址</span><code>{{ config.frps_server_addr }}:{{ config.frps_bind_port }}</code></li>
+    <li><span>远程端口范围</span><code>{{ config.remote_port_min }}-{{ config.remote_port_max }}</code></li>
+    <li><span>每个用户最多隧道数</span><code>{{ config.user_max_tunnels }}</code></li>
   </ul>
-</article>
+</section>
 {% endblock %}
