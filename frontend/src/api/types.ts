@@ -48,6 +48,20 @@ export interface AdminTunnelRow {
   username: string
 }
 
+export interface AdminTrafficSummary {
+  available: boolean
+  total_traffic_in: number
+  total_traffic_out: number
+  tunnels: AdminTunnelTraffic[]
+}
+
+export interface AdminTunnelTraffic {
+  tunnel: Tunnel
+  username: string
+  traffic_in: number
+  traffic_out: number
+}
+
 export interface PageResponse<T> {
   items: T[]
   total: number

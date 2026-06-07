@@ -18,8 +18,9 @@ use crate::{
     entities::{invite_codes, tunnels, users},
     error::{AppError, AppResult},
     routes::types::{
-        AdminSummaryResponse, AdminTunnelResponse, ConfigResponse, FrpsStatusResponse,
-        InviteResponse, OkResponse, PageResponse, PublicUser, TunnelResponse, UserRowResponse,
+        AdminSummaryResponse, AdminTrafficSummaryResponse, AdminTunnelResponse,
+        AdminTunnelTrafficResponse, ConfigResponse, FrpsStatusResponse, InviteResponse, OkResponse,
+        PageResponse, PublicUser, TunnelResponse, UserRowResponse,
     },
     services::{frps, invite, password, validation},
     state::AppState,
@@ -349,6 +350,64 @@ pub async fn all_tunnels(
         })
         .collect::<Vec<_>>();
     Ok(Json(page_response(items, &query)))
+}
+
+pub async fn traffic_summary(
+    State(state): State<AppState>,
+    AdminUser(_user): AdminUser,
+) -> AppResult<impl IntoResponse> {
+    let frps = state.frps.read().await.clone();
+    let snapshot = frps::traffic_snapshot(&frps).await;
+    if !snapshot.available {
+        return Ok(Json(AdminTrafficSummaryResponse {
+            available: false,
+            total_traffic_in: 0,
+            total_traffic_out: 0,
+            tunnels: Vec::new(),
+        }));
+    }
+
+    let users = users::Entity::find().all(&state.db).await?;
+    let usernames = users
+        .into_iter()
+        .map(|user| (user.id, user.username))
+        .collect::<HashMap<_, _>>();
+    let traffic = snapshot
+        .proxies
+        .into_iter()
+        .map(|proxy| {
+            (
+                (proxy.protocol, proxy.name),
+                (proxy.traffic_in, proxy.traffic_out),
+            )
+        })
+        .collect::<HashMap<_, _>>();
+
+    let mut total_traffic_in = 0;
+    let mut total_traffic_out = 0;
+    let mut rows = Vec::new();
+    for tunnel in tunnels::Entity::find().all(&state.db).await? {
+        let key = (tunnel.protocol.clone(), tunnel.name.clone());
+        let (traffic_in, traffic_out) = traffic.get(&key).copied().unwrap_or((0, 0));
+        total_traffic_in += traffic_in;
+        total_traffic_out += traffic_out;
+        rows.push(AdminTunnelTrafficResponse {
+            username: usernames
+                .get(&tunnel.user_id)
+                .cloned()
+                .unwrap_or_else(|| "未知用户".to_owned()),
+            tunnel: TunnelResponse::from(tunnel),
+            traffic_in,
+            traffic_out,
+        });
+    }
+
+    Ok(Json(AdminTrafficSummaryResponse {
+        available: true,
+        total_traffic_in,
+        total_traffic_out,
+        tunnels: rows,
+    }))
 }
 
 pub async fn frps_status(

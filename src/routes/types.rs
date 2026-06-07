@@ -131,6 +131,22 @@ pub struct AdminSummaryResponse {
 }
 
 #[derive(Serialize)]
+pub struct AdminTrafficSummaryResponse {
+    pub available: bool,
+    pub total_traffic_in: u64,
+    pub total_traffic_out: u64,
+    pub tunnels: Vec<AdminTunnelTrafficResponse>,
+}
+
+#[derive(Serialize)]
+pub struct AdminTunnelTrafficResponse {
+    pub tunnel: TunnelResponse,
+    pub username: String,
+    pub traffic_in: u64,
+    pub traffic_out: u64,
+}
+
+#[derive(Serialize)]
 pub struct FrpsStatusResponse {
     pub server_addr: String,
     pub bind_port: u16,

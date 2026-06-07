@@ -2,7 +2,8 @@ use std::path::Path;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tokio::{net::TcpStream, process::Command};
 
 use crate::config::Config;
@@ -28,6 +29,23 @@ pub struct FrpsRuntimeStatus {
     pub state: String,
     pub version: String,
     pub display_status: String,
+}
+
+pub struct FrpsTrafficSnapshot {
+    pub available: bool,
+    pub proxies: Vec<FrpsProxyTraffic>,
+}
+
+pub struct FrpsProxyTraffic {
+    pub name: String,
+    pub protocol: String,
+    pub traffic_in: u64,
+    pub traffic_out: u64,
+}
+
+#[derive(Deserialize)]
+struct FrpsProxyList {
+    proxies: Vec<Value>,
 }
 
 #[derive(Serialize)]
@@ -217,20 +235,78 @@ pub async fn write_panel_config(config: &FrpsRuntimeConfig) -> Result<()> {
 }
 
 pub async fn dashboard_available(config: &FrpsRuntimeConfig) -> bool {
+    get_dashboard(config, "/api/serverinfo")
+        .await
+        .map(|response| response.status().is_success())
+        .unwrap_or(false)
+}
+
+pub async fn traffic_snapshot(config: &FrpsRuntimeConfig) -> FrpsTrafficSnapshot {
+    if config.dashboard_port.is_none() {
+        return FrpsTrafficSnapshot {
+            available: false,
+            proxies: Vec::new(),
+        };
+    }
+
+    let mut proxies = Vec::new();
+    for protocol in ["tcp", "udp"] {
+        let Ok(response) = get_dashboard(config, &format!("/api/proxy/{protocol}")).await else {
+            return FrpsTrafficSnapshot {
+                available: false,
+                proxies: Vec::new(),
+            };
+        };
+        if !response.status().is_success() {
+            return FrpsTrafficSnapshot {
+                available: false,
+                proxies: Vec::new(),
+            };
+        }
+        let Ok(list) = response.json::<FrpsProxyList>().await else {
+            return FrpsTrafficSnapshot {
+                available: false,
+                proxies: Vec::new(),
+            };
+        };
+        proxies.extend(list.proxies.into_iter().map(|proxy| FrpsProxyTraffic {
+            name: proxy_string(&proxy, &["name", "proxyName"]),
+            protocol: protocol.to_owned(),
+            traffic_in: proxy_u64(&proxy, &["trafficIn", "todayTrafficIn", "curConns"]),
+            traffic_out: proxy_u64(&proxy, &["trafficOut", "todayTrafficOut"]),
+        }));
+    }
+
+    FrpsTrafficSnapshot {
+        available: true,
+        proxies,
+    }
+}
+
+async fn get_dashboard(config: &FrpsRuntimeConfig, path: &str) -> Result<reqwest::Response> {
     let Some(port) = config.dashboard_port else {
-        return false;
+        anyhow::bail!("frps dashboard is not configured");
     };
-    let url = format!("http://{}:{port}/api/serverinfo", config.dashboard_addr);
+    let url = format!("http://{}:{port}{path}", config.dashboard_addr);
     let client = reqwest::Client::new();
     let mut request = client.get(url).timeout(Duration::from_secs(2));
     if !config.dashboard_user.is_empty() {
         request = request.basic_auth(&config.dashboard_user, Some(&config.dashboard_password));
     }
-    request
-        .send()
-        .await
-        .map(|response| response.status().is_success())
-        .unwrap_or(false)
+    Ok(request.send().await?)
+}
+
+fn proxy_string(proxy: &Value, keys: &[&str]) -> String {
+    keys.iter()
+        .find_map(|key| proxy.get(*key).and_then(Value::as_str))
+        .unwrap_or("")
+        .to_owned()
+}
+
+fn proxy_u64(proxy: &Value, keys: &[&str]) -> u64 {
+    keys.iter()
+        .find_map(|key| proxy.get(*key).and_then(Value::as_u64))
+        .unwrap_or(0)
 }
 
 pub async fn runtime_status(config: &FrpsRuntimeConfig, restarting: bool) -> FrpsRuntimeStatus {

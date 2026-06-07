@@ -56,6 +56,7 @@ pub fn router() -> Router<AppState> {
             "/api/admin/users/{id}/quota",
             post(admin::update_user_quota),
         )
+        .route("/api/admin/traffic/summary", get(admin::traffic_summary))
         .route("/api/admin/tunnels", get(admin::all_tunnels))
         .route("/api/admin/tunnels/{id}", delete(admin::delete_tunnel))
 }

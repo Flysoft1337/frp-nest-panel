@@ -1,6 +1,7 @@
 import { api } from './client'
 import type {
   AdminSummary,
+  AdminTrafficSummary,
   AdminTunnelRow,
   ConfigResponse,
   FrpsStatus,
@@ -27,6 +28,10 @@ export function getConfig() {
 
 export function getAdminSummary() {
   return api<AdminSummary>('/api/admin/summary')
+}
+
+export function getAdminTrafficSummary() {
+  return api<AdminTrafficSummary>('/api/admin/traffic/summary')
 }
 
 export function listInvites(params?: ListParams) {

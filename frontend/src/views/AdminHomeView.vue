@@ -1,19 +1,28 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-import { getAdminSummary, getConfig } from '../api/admin'
-import type { AdminSummary, ConfigResponse } from '../api/types'
+import { getAdminSummary, getAdminTrafficSummary, getConfig } from '../api/admin'
+import type { AdminSummary, AdminTrafficSummary, ConfigResponse } from '../api/types'
 import PageHeader from '../components/PageHeader.vue'
 
 const config = ref<ConfigResponse | null>(null)
 const summary = ref<AdminSummary | null>(null)
+const traffic = ref<AdminTrafficSummary | null>(null)
 const error = ref('')
+
+function formatBytes(value: number) {
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`
+  if (value < 1024 * 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MiB`
+  return `${(value / 1024 / 1024 / 1024).toFixed(1)} GiB`
+}
 
 onMounted(async () => {
   try {
-    const [configData, summaryData] = await Promise.all([getConfig(), getAdminSummary()])
+    const [configData, summaryData, trafficData] = await Promise.all([getConfig(), getAdminSummary(), getAdminTrafficSummary()])
     config.value = configData
     summary.value = summaryData
+    traffic.value = trafficData
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载失败'
   }
@@ -32,6 +41,19 @@ onMounted(async () => {
     <div class="card p-5"><div class="text-sm text-slate-400">邀请码</div><div class="mt-2 text-3xl font-black text-white">{{ summary.invite_count }}</div></div>
     <div class="card p-5"><div class="text-sm text-slate-400">未用邀请码</div><div class="mt-2 text-3xl font-black text-white">{{ summary.unused_invite_count }}</div></div>
     <div class="card p-5"><div class="text-sm text-slate-400">端口占用</div><div class="mt-2 text-xl font-black text-white">{{ summary.used_remote_port_count }} / {{ summary.remote_port_capacity }}</div></div>
+  </section>
+
+  <section v-if="traffic" class="card mt-6 p-6">
+    <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h2 class="text-xl font-bold text-white">总流量</h2>
+        <p class="text-sm text-slate-400">{{ traffic.available ? '来自 frps dashboard 的真实数据。' : 'frps dashboard 数据源未配置或不可用。' }}</p>
+      </div>
+      <div class="grid gap-3 text-sm md:grid-cols-2">
+        <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3"><span class="text-slate-400">入站</span><div class="font-mono text-cyan-100">{{ formatBytes(traffic.total_traffic_in) }}</div></div>
+        <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3"><span class="text-slate-400">出站</span><div class="font-mono text-cyan-100">{{ formatBytes(traffic.total_traffic_out) }}</div></div>
+      </div>
+    </div>
   </section>
 
   <div class="mt-6 grid gap-4 md:grid-cols-4">
