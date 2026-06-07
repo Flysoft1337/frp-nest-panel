@@ -26,6 +26,7 @@ pub struct TunnelForm {
     protocol: String,
     local_host: String,
     local_port: i32,
+    remote_port: Option<i32>,
 }
 
 pub async fn create(
@@ -50,11 +51,24 @@ pub async fn create(
     let local_host = validation::local_host(&form.local_host)?;
     let local_port = validation::local_port(form.local_port)?;
 
-    for _ in 0..5 {
-        let frps = state.frps.read().await.clone();
-        let remote_port =
-            ports::allocate_remote_port(&state.db, frps.remote_port_min, frps.remote_port_max)
-                .await?;
+    let frps = state.frps.read().await.clone();
+    let attempts = if form.remote_port.is_some() { 1 } else { 5 };
+    for _ in 0..attempts {
+        let remote_port = match form.remote_port {
+            Some(remote_port) => {
+                ports::validate_remote_port_available(
+                    &state.db,
+                    remote_port,
+                    frps.remote_port_min,
+                    frps.remote_port_max,
+                )
+                .await?
+            }
+            None => {
+                ports::allocate_remote_port(&state.db, frps.remote_port_min, frps.remote_port_max)
+                    .await?
+            }
+        };
 
         let result = tunnels::ActiveModel {
             id: Set(Uuid::new_v4()),

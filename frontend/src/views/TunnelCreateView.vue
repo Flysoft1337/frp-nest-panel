@@ -47,6 +47,7 @@ async function submit() {
       protocol: protocol.value,
       local_host: localHost.value,
       local_port: localPort.value,
+      remote_port: isEdit.value ? undefined : remotePort.value,
     }
     if (tunnelId.value) {
       await updateTunnel(tunnelId.value, input)
@@ -68,7 +69,7 @@ onMounted(loadTunnel)
   <PageHeader
     eyebrow="Tunnel"
     :title="isEdit ? '编辑隧道' : '创建隧道'"
-    :description="isEdit ? '修改隧道名称、协议和本地服务地址。远程端口保持不变。' : '选择 TCP 或 UDP，并填写本地服务地址。'"
+    :description="isEdit ? '修改隧道名称、协议和本地服务地址。远程端口保持不变。' : '选择 TCP 或 UDP，并填写本地服务地址。远程端口可选。'"
   />
   <section class="card max-w-2xl p-6">
     <p v-if="loadingTunnel" class="mb-4 text-sm text-slate-400">加载中</p>
@@ -84,6 +85,7 @@ onMounted(loadTunnel)
         <label>本地地址<input v-model="localHost" required /></label>
         <label>本地端口<input v-model="localPort" max="65535" min="1" required type="number" /></label>
       </div>
+      <label v-if="!isEdit">远程端口（可选）<input v-model="remotePort" max="65535" min="1" placeholder="留空自动分配" type="number" /></label>
       <div v-if="isEdit && remotePort" class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
         远程端口保持不变：<code class="text-cyan-100">{{ remotePort }}</code>
       </div>

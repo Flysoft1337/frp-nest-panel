@@ -5,6 +5,26 @@ use crate::{
     error::{AppError, AppResult},
 };
 
+pub async fn validate_remote_port_available(
+    db: &DatabaseConnection,
+    remote_port: i32,
+    min: i32,
+    max: i32,
+) -> AppResult<i32> {
+    if remote_port < min || remote_port > max {
+        return Err(AppError::BadRequest("远程端口不在允许范围内".to_owned()));
+    }
+    let exists = tunnels::Entity::find()
+        .filter(tunnels::Column::RemotePort.eq(remote_port))
+        .one(db)
+        .await?
+        .is_some();
+    if exists {
+        return Err(AppError::BadRequest("远程端口已被占用".to_owned()));
+    }
+    Ok(remote_port)
+}
+
 pub async fn allocate_remote_port(db: &DatabaseConnection, min: i32, max: i32) -> AppResult<i32> {
     let used = tunnels::Entity::find()
         .filter(tunnels::Column::RemotePort.gte(min))

@@ -6,6 +6,7 @@ export interface TunnelInput {
   protocol: string
   local_host: string
   local_port: number
+  remote_port?: number | null
 }
 
 export function listTunnels() {
