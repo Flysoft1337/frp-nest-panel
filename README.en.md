@@ -1,8 +1,8 @@
-# frp-lite-panel
+# frp-nest-panel
 
 [中文](README.md)
 
-`frp-lite-panel` is a lightweight multi-user self-service panel built on top of the official frp project. It does not replace frps/frpc. Instead, it manages users, invite codes, remote port allocation, and `frpc.toml` generation so friends or team members can create TCP tunnels by themselves.
+`frp-nest-panel` is a lightweight multi-user self-service panel built on top of the official frp project. It does not replace frps/frpc. Instead, it manages users, invite codes, remote port allocation, and `frpc.toml` generation so friends or team members can create TCP tunnels by themselves.
 
 ## Features
 
@@ -77,7 +77,7 @@ cargo build --release
 Copy the binary to your server:
 
 ```bash
-scp target/release/frp-lite-panel root@your-server:/opt/frp-lite-panel/frp-lite-panel
+scp target/release/frp-nest-panel root@your-server:/opt/frp-nest-panel/frp-nest-panel
 ```
 
 Prepare `.env`, then run the binary with systemd or your preferred process manager.

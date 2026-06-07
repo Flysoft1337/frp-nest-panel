@@ -724,7 +724,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "frp-lite-panel"
+name = "frp-nest-panel"
 version = "0.1.0"
 dependencies = [
  "anyhow",

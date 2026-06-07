@@ -1,5 +1,5 @@
 [package]
-name = "frp-lite-panel"
+name = "frp-nest-panel"
 version = "0.1.0"
 edition = "2021"
 

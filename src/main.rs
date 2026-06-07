@@ -26,7 +26,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "frp_lite_panel=debug,tower_http=debug".into()),
+                .unwrap_or_else(|_| "frp_nest_panel=debug,tower_http=debug".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -67,7 +67,7 @@ async fn main() -> anyhow::Result<()> {
         remote_port_min = config.remote_port_min,
         remote_port_max = config.remote_port_max,
         user_max_tunnels = config.user_max_tunnels,
-        "frp-lite-panel starting"
+        "frp-nest-panel starting"
     );
     axum::serve(listener, app).await?;
     Ok(())

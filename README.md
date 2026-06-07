@@ -1,8 +1,8 @@
-# frp-lite-panel
+# frp-nest-panel
 
 [English](README.en.md)
 
-`frp-lite-panel` 是一个基于官方 frp 的轻量多用户自助面板。它不替代 frps/frpc，而是负责用户、邀请码、端口分配和 `frpc.toml` 生成，让朋友或团队成员可以自助创建 TCP 隧道。
+`frp-nest-panel` 是一个基于官方 frp 的轻量多用户自助面板。它不替代 frps/frpc，而是负责用户、邀请码、端口分配和 `frpc.toml` 生成，让朋友或团队成员可以自助创建 TCP 隧道。
 
 ## 功能
 
@@ -77,7 +77,7 @@ cargo build --release
 复制二进制到服务器：
 
 ```bash
-scp target/release/frp-lite-panel root@your-server:/opt/frp-lite-panel/frp-lite-panel
+scp target/release/frp-nest-panel root@your-server:/opt/frp-nest-panel/frp-nest-panel
 ```
 
 准备 `.env` 后，用 systemd 或你自己的进程管理工具运行。
