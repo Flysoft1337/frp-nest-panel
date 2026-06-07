@@ -50,7 +50,6 @@ async fn main() -> anyhow::Result<()> {
         db,
         frps: Arc::new(RwLock::new(frps_config.clone())),
         frps_restarting: Arc::new(AtomicBool::new(false)),
-        frps_upgrading: Arc::new(AtomicBool::new(false)),
     };
 
     let mut key_bytes = [0_u8; 64];

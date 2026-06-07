@@ -10,7 +10,8 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
   frps:
-    image: snowdreamtech/frps:0.62.1
+    image: snowdreamtech/frps:0.69.1
+    entrypoint: /usr/bin/frps
     restart: unless-stopped
     network_mode: host
     command: -c /etc/frp/frps.toml

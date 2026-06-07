@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 
-import { getFrps, restartFrps, updateFrps, upgradeFrps } from '../api/admin'
+import { getFrps, restartFrps, updateFrps } from '../api/admin'
 import type { FrpsStatus } from '../api/types'
 import AdminNav from '../components/AdminNav.vue'
 import AlertBox from '../components/AlertBox.vue'
@@ -23,7 +23,6 @@ const form = reactive({
   dashboard_user: '',
   dashboard_password: '',
 })
-const upgradeVersion = ref('')
 const error = ref('')
 const message = ref('')
 
@@ -39,9 +38,6 @@ async function load() {
   form.dashboard_port = data.dashboard_port
   form.dashboard_user = data.dashboard_user
   form.dashboard_password = ''
-  upgradeVersion.value = data.available_versions.includes(data.version.replace(/^v/, ''))
-    ? data.version.replace(/^v/, '')
-    : data.available_versions[0] || ''
 }
 
 async function save() {
@@ -65,19 +61,6 @@ async function restart() {
     message.value = 'frps 已重启'
   } catch (err) {
     error.value = err instanceof Error ? err.message : '重启失败'
-  }
-}
-
-async function upgrade() {
-  if (!upgradeVersion.value) return
-  error.value = ''
-  message.value = ''
-  try {
-    const result = await upgradeFrps(upgradeVersion.value)
-    await load()
-    message.value = `frps 已升级：${result.message}`
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : '升级失败'
   }
 }
 
@@ -116,11 +99,10 @@ onMounted(async () => {
     <StatCard label="版本" :value="status.version" />
     <StatCard label="配置文件" :value="status.config_path" />
     <StatCard label="Token" :value="status.token_set ? '已设置' : '未设置'" />
-    <div class="card p-5">
+    <div class="card p-5 md:col-span-2 xl:col-span-2">
       <div class="text-sm text-slate-400">Dashboard</div>
       <div class="mt-2"><StatusPill :tone="status.dashboard_available ? 'success' : 'default'">{{ status.dashboard_available ? '可用' : status.dashboard_configured ? '不可用' : '未配置' }}</StatusPill></div>
     </div>
-    <StatCard label="升级" :value="status.upgrade_supported ? '可用' : '暂未开放'" />
   </section>
 
   <section class="card mt-6 p-6">
@@ -163,26 +145,6 @@ onMounted(async () => {
           <FormField label="Dashboard 端口"><input v-model="form.dashboard_port" max="65535" min="1" placeholder="留空关闭" type="number" /></FormField>
           <FormField label="Dashboard 用户"><input v-model="form.dashboard_user" autocomplete="username" placeholder="admin" /></FormField>
           <FormField label="Dashboard 密码" note="留空表示不修改"><input v-model="form.dashboard_password" autocomplete="new-password" placeholder="留空表示不修改" type="password" /></FormField>
-        </div>
-      </section>
-
-      <section class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-        <div class="mb-4 flex flex-col gap-1">
-          <h2 class="text-lg font-bold text-white">版本升级</h2>
-          <p class="text-sm text-slate-400">当前版本 {{ status?.version || '未知' }}。升级会拉取新镜像并重启 frps。</p>
-        </div>
-        <div class="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
-          <FormField label="目标版本">
-            <select v-model="upgradeVersion" :disabled="!status?.upgrade_supported || status?.upgrading || status?.restarting">
-              <option v-for="version in status?.available_versions || []" :key="version" :value="version">v{{ version }}</option>
-            </select>
-          </FormField>
-          <ConfirmButton
-            class-name="btn-danger"
-            :busy="!status?.upgrade_supported || status?.upgrading || status?.restarting || !upgradeVersion"
-            :message="`升级到 v${upgradeVersion} 会重启 frps，影响所有隧道连接，确定继续吗？`"
-            @confirm="upgrade"
-          >{{ status?.upgrading ? '升级中' : '升级 frps' }}</ConfirmButton>
         </div>
       </section>
 
