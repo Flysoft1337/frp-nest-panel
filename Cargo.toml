@@ -18,6 +18,7 @@ rand = "0.8"
 sea-orm = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono", "with-uuid"] }
 sea-orm-migration = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls"] }
 serde = { version = "1.0", features = ["derive"] }
+toml = "0.9"
 thiserror = "2.0"
 tokio = { version = "1.45", features = ["full"] }
 tower-http = { version = "0.6", features = ["fs", "trace"] }

@@ -14,7 +14,7 @@ services:
     restart: unless-stopped
     command: -c /etc/frp/frps.toml
     volumes:
-      - ./frps/frps.example.toml:/etc/frp/frps.toml:ro
+      - ./frps/frps.toml:/etc/frp/frps.toml:ro
     ports:
       - "7000:7000"
       - "20000-30000:20000-30000"

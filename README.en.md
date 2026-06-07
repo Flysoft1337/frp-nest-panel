@@ -136,7 +136,7 @@ remotePort = 20001
 
 ### Does this project modify frps configuration automatically?
 
-No. The first version keeps frps independent. The panel only allocates ports and generates frpc configs.
+Admins can save local frps settings from the panel. Saving writes `frps/frps.toml` but does not restart frps automatically; restart requires manual confirmation in the admin page.
 
 ### Can friends create tunnels by themselves?
 

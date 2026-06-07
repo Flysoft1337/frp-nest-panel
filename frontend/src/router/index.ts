@@ -17,6 +17,7 @@ const router = createRouter({
     { path: '/admin/invites', component: () => import('../views/AdminInvitesView.vue'), meta: { admin: true } },
     { path: '/admin/users', component: () => import('../views/AdminUsersView.vue'), meta: { admin: true } },
     { path: '/admin/tunnels', component: () => import('../views/AdminTunnelsView.vue'), meta: { admin: true } },
+    { path: '/admin/frps', component: () => import('../views/AdminFrpsView.vue'), meta: { admin: true } },
     { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
   ],
 })

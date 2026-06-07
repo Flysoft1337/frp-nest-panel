@@ -7,10 +7,12 @@ mod services;
 mod spa;
 mod state;
 
+use std::sync::Arc;
+
 use axum::{routing::get, Router};
 use migration::{Migrator, MigratorTrait};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, Database, EntityTrait};
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, sync::RwLock};
 use tower_http::{
     services::{ServeDir, ServeFile},
     trace::TraceLayer,
@@ -20,7 +22,12 @@ use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
-use crate::{config::Config, entities::users, services::password, state::AppState};
+use crate::{
+    config::Config,
+    entities::users,
+    services::{frps, password},
+    state::AppState,
+};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -36,10 +43,12 @@ async fn main() -> anyhow::Result<()> {
     let db = Database::connect(&config.database_url).await?;
     Migrator::up(&db, None).await?;
     ensure_initial_admin(&db, &config).await?;
+    let frps_config = frps::load_runtime_config(&config).await?;
 
     let state = AppState {
         config: config.clone(),
         db,
+        frps: Arc::new(RwLock::new(frps_config.clone())),
     };
 
     let mut key_bytes = [0_u8; 64];
@@ -65,10 +74,10 @@ async fn main() -> anyhow::Result<()> {
     let listener = TcpListener::bind(config.app_bind).await?;
     tracing::info!(
         bind = %config.app_bind,
-        frps_server_addr = %config.frps_server_addr,
-        frps_bind_port = config.frps_bind_port,
-        remote_port_min = config.remote_port_min,
-        remote_port_max = config.remote_port_max,
+        frps_server_addr = %frps_config.server_addr,
+        frps_bind_port = frps_config.bind_port,
+        remote_port_min = frps_config.remote_port_min,
+        remote_port_max = frps_config.remote_port_max,
         user_max_tunnels = config.user_max_tunnels,
         "frp-nest-panel starting"
     );

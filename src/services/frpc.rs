@@ -1,9 +1,13 @@
 use crate::{
-    config::Config,
     entities::{tunnels, users},
+    services::frps::FrpsRuntimeConfig,
 };
 
-pub fn render_frpc_toml(config: &Config, user: &users::Model, tunnel: &tunnels::Model) -> String {
+pub fn render_frpc_toml(
+    config: &FrpsRuntimeConfig,
+    user: &users::Model,
+    tunnel: &tunnels::Model,
+) -> String {
     format!(
         r#"serverAddr = "{server_addr}"
 serverPort = {server_port}
@@ -21,9 +25,9 @@ localIP = "{local_host}"
 localPort = {local_port}
 remotePort = {remote_port}
 "#,
-        server_addr = config.frps_server_addr,
-        server_port = config.frps_bind_port,
-        token = config.frps_auth_token,
+        server_addr = config.server_addr,
+        server_port = config.bind_port,
+        token = config.auth_token,
         username = user.username,
         proxy_name = tunnel.name,
         protocol = tunnel.protocol,

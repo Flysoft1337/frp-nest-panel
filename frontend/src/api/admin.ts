@@ -1,12 +1,36 @@
 import { api } from './client'
-import type { ConfigResponse, Invite, Tunnel, UserRow } from './types'
+import type {
+  AdminSummary,
+  AdminTunnelRow,
+  ConfigResponse,
+  FrpsStatus,
+  FrpsUpdate,
+  Invite,
+  ListParams,
+  PageResponse,
+  UserRow,
+} from './types'
+
+function withParams(path: string, params: ListParams = {}) {
+  const query = new URLSearchParams()
+  if (params.q) query.set('q', params.q)
+  if (params.status) query.set('status', params.status)
+  if (params.page) query.set('page', String(params.page))
+  if (params.page_size) query.set('page_size', String(params.page_size))
+  const text = query.toString()
+  return text ? `${path}?${text}` : path
+}
 
 export function getConfig() {
   return api<ConfigResponse>('/api/admin/config')
 }
 
-export function listInvites() {
-  return api<Invite[]>('/api/admin/invites')
+export function getAdminSummary() {
+  return api<AdminSummary>('/api/admin/summary')
+}
+
+export function listInvites(params?: ListParams) {
+  return api<PageResponse<Invite>>(withParams('/api/admin/invites', params))
 }
 
 export function createInvites(count: number, expiresDays: number | null) {
@@ -16,8 +40,12 @@ export function createInvites(count: number, expiresDays: number | null) {
   })
 }
 
-export function listUsers() {
-  return api<UserRow[]>('/api/admin/users')
+export function deleteInvite(id: string) {
+  return api<{ ok: boolean }>(`/api/admin/invites/${id}`, { method: 'DELETE' })
+}
+
+export function listUsers(params?: ListParams) {
+  return api<PageResponse<UserRow>>(withParams('/api/admin/users', params))
 }
 
 export function enableUser(id: string) {
@@ -35,10 +63,22 @@ export function resetUserPassword(id: string, newPassword: string) {
   })
 }
 
-export function listAllTunnels() {
-  return api<Tunnel[]>('/api/admin/tunnels')
+export function listAllTunnels(params?: ListParams) {
+  return api<PageResponse<AdminTunnelRow>>(withParams('/api/admin/tunnels', params))
 }
 
 export function deleteTunnel(id: string) {
   return api<{ ok: boolean }>(`/api/admin/tunnels/${id}`, { method: 'DELETE' })
+}
+
+export function getFrps() {
+  return api<FrpsStatus>('/api/admin/frps')
+}
+
+export function updateFrps(form: FrpsUpdate) {
+  return api<{ ok: boolean }>('/api/admin/frps', { method: 'PUT', json: form })
+}
+
+export function restartFrps() {
+  return api<{ ok: boolean }>('/api/admin/frps/restart', { method: 'POST' })
 }

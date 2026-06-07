@@ -103,6 +103,43 @@ pub struct UserRowResponse {
 }
 
 #[derive(Serialize)]
+pub struct AdminTunnelResponse {
+    pub tunnel: TunnelResponse,
+    pub username: String,
+}
+
+#[derive(Serialize)]
+pub struct PageResponse<T> {
+    pub items: Vec<T>,
+    pub total: u64,
+    pub page: u64,
+    pub page_size: u64,
+}
+
+#[derive(Serialize)]
+pub struct AdminSummaryResponse {
+    pub user_count: u64,
+    pub disabled_user_count: u64,
+    pub tunnel_count: u64,
+    pub invite_count: u64,
+    pub unused_invite_count: u64,
+    pub used_remote_port_count: u64,
+    pub remote_port_capacity: u64,
+}
+
+#[derive(Serialize)]
+pub struct FrpsStatusResponse {
+    pub server_addr: String,
+    pub bind_port: u16,
+    pub token_set: bool,
+    pub remote_port_min: i32,
+    pub remote_port_max: i32,
+    pub config_path: String,
+    pub status: String,
+    pub restart_command_configured: bool,
+}
+
+#[derive(Serialize)]
 pub struct ConfigResponse {
     pub frps_server_addr: String,
     pub frps_bind_port: u16,

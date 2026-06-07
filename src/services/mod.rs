@@ -1,4 +1,5 @@
 pub mod frpc;
+pub mod frps;
 pub mod invite;
 pub mod password;
 pub mod ports;

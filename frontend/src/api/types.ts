@@ -41,6 +41,54 @@ export interface UserRow {
   tunnel_count: number
 }
 
+export interface AdminTunnelRow {
+  tunnel: Tunnel
+  username: string
+}
+
+export interface PageResponse<T> {
+  items: T[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface ListParams {
+  q?: string
+  status?: string
+  page?: number
+  page_size?: number
+}
+
+export interface AdminSummary {
+  user_count: number
+  disabled_user_count: number
+  tunnel_count: number
+  invite_count: number
+  unused_invite_count: number
+  used_remote_port_count: number
+  remote_port_capacity: number
+}
+
+export interface FrpsStatus {
+  server_addr: string
+  bind_port: number
+  token_set: boolean
+  remote_port_min: number
+  remote_port_max: number
+  config_path: string
+  status: string
+  restart_command_configured: boolean
+}
+
+export interface FrpsUpdate {
+  server_addr: string
+  bind_port: number
+  auth_token: string
+  remote_port_min: number
+  remote_port_max: number
+}
+
 export interface ConfigResponse {
   frps_server_addr: string
   frps_bind_port: number

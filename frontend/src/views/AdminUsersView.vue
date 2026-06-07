@@ -1,34 +1,62 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 
 import { disableUser, enableUser, listUsers, resetUserPassword } from '../api/admin'
-import type { UserRow } from '../api/types'
+import type { PageResponse, UserRow } from '../api/types'
 import ConfirmButton from '../components/ConfirmButton.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusPill from '../components/StatusPill.vue'
 import { useSessionStore } from '../stores/session'
 
 const session = useSessionStore()
-const rows = ref<UserRow[]>([])
+const page = ref<PageResponse<UserRow> | null>(null)
 const passwords = reactive<Record<string, string>>({})
+const q = ref('')
+const status = ref('')
+const currentPage = ref(1)
 const error = ref('')
+const message = ref('')
+
+const totalPages = computed(() => {
+  if (!page.value) return 1
+  return Math.max(1, Math.ceil(page.value.total / page.value.page_size))
+})
 
 async function load() {
-  rows.value = await listUsers()
+  page.value = await listUsers({ q: q.value, status: status.value, page: currentPage.value })
 }
 
 async function toggle(id: string, disabled: boolean) {
-  if (disabled) await enableUser(id)
-  else await disableUser(id)
-  await load()
+  error.value = ''
+  message.value = ''
+  try {
+    if (disabled) await enableUser(id)
+    else await disableUser(id)
+    await load()
+    message.value = disabled ? '用户已启用' : '用户已禁用'
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '操作失败'
+  }
 }
 
 async function reset(id: string) {
   const password = passwords[id]
   if (!password) return
-  await resetUserPassword(id, password)
-  passwords[id] = ''
+  error.value = ''
+  message.value = ''
+  try {
+    await resetUserPassword(id, password)
+    passwords[id] = ''
+    message.value = '密码已重置'
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '重置失败'
+  }
 }
+
+watch([q, status], () => {
+  currentPage.value = 1
+  load().catch((err) => { error.value = err instanceof Error ? err.message : '加载失败' })
+})
 
 onMounted(async () => {
   try {
@@ -43,11 +71,20 @@ onMounted(async () => {
   <PageHeader eyebrow="Admin" title="用户" description="查看用户状态、隧道数量和重置密码。" />
   <section class="card p-6">
     <p v-if="error" class="mb-4 rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{{ error }}</p>
+    <p v-if="message" class="mb-4 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">{{ message }}</p>
+    <div class="mb-4 grid gap-3 md:grid-cols-[1fr_180px]">
+      <input v-model="q" placeholder="搜索用户名" />
+      <select v-model="status">
+        <option value="">全部状态</option>
+        <option value="enabled">正常</option>
+        <option value="disabled">已禁用</option>
+      </select>
+    </div>
     <div class="table-wrap">
       <table class="data-table">
         <thead><tr><th>用户名</th><th>角色</th><th>状态</th><th>隧道数</th><th>创建时间</th><th>操作</th><th>重置密码</th></tr></thead>
         <tbody>
-          <tr v-for="row in rows" :key="row.user.id">
+          <tr v-for="row in page?.items || []" :key="row.user.id">
             <td class="font-semibold text-white">{{ row.user.username }}</td>
             <td><StatusPill>{{ row.user.role }}</StatusPill></td>
             <td><StatusPill :tone="row.user.disabled ? 'danger' : 'success'">{{ row.user.disabled ? '已禁用' : '正常' }}</StatusPill></td>
@@ -66,6 +103,14 @@ onMounted(async () => {
           </tr>
         </tbody>
       </table>
+    </div>
+    <div class="mt-4 flex items-center justify-between text-sm text-slate-400">
+      <span>共 {{ page?.total || 0 }} 条</span>
+      <div class="flex items-center gap-2">
+        <button class="btn-secondary" :disabled="currentPage <= 1" @click="currentPage--; load()">上一页</button>
+        <span>{{ currentPage }} / {{ totalPages }}</span>
+        <button class="btn-secondary" :disabled="currentPage >= totalPages" @click="currentPage++; load()">下一页</button>
+      </div>
     </div>
   </section>
 </template>

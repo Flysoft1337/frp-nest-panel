@@ -34,10 +34,17 @@ pub fn router() -> Router<AppState> {
         .route("/api/tunnels/{id}/frpc", get(tunnels::preview_frpc))
         .route("/tunnels/{id}/frpc.toml", get(tunnels::download_frpc))
         .route("/api/admin/config", get(admin::config))
+        .route("/api/admin/summary", get(admin::summary))
+        .route(
+            "/api/admin/frps",
+            get(admin::frps_status).put(admin::update_frps),
+        )
+        .route("/api/admin/frps/restart", post(admin::restart_frps))
         .route(
             "/api/admin/invites",
             get(admin::invites).post(admin::create_invite),
         )
+        .route("/api/admin/invites/{id}", delete(admin::delete_invite))
         .route("/api/admin/users", get(admin::users))
         .route("/api/admin/users/{id}/disable", post(admin::disable_user))
         .route("/api/admin/users/{id}/enable", post(admin::enable_user))

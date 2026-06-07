@@ -47,12 +47,10 @@ pub async fn create(
     let local_port = validation::local_port(form.local_port)?;
 
     for _ in 0..5 {
-        let remote_port = ports::allocate_remote_port(
-            &state.db,
-            state.config.remote_port_min,
-            state.config.remote_port_max,
-        )
-        .await?;
+        let frps = state.frps.read().await.clone();
+        let remote_port =
+            ports::allocate_remote_port(&state.db, frps.remote_port_min, frps.remote_port_max)
+                .await?;
 
         let result = tunnels::ActiveModel {
             id: Set(Uuid::new_v4()),
@@ -127,7 +125,8 @@ pub async fn preview_frpc(
 ) -> AppResult<impl IntoResponse> {
     let tunnel = get_owned_tunnel(&state, user.id, id).await?;
 
-    let frpc_toml = frpc::render_frpc_toml(&state.config, &user, &tunnel);
+    let frps = state.frps.read().await;
+    let frpc_toml = frpc::render_frpc_toml(&frps, &user, &tunnel);
     Ok(Json(FrpcResponse {
         tunnel: TunnelResponse::from(tunnel),
         frpc_toml,
@@ -141,7 +140,8 @@ pub async fn download_frpc(
 ) -> AppResult<impl IntoResponse> {
     let tunnel = get_owned_tunnel(&state, user.id, id).await?;
 
-    let body = frpc::render_frpc_toml(&state.config, &user, &tunnel);
+    let frps = state.frps.read().await;
+    let body = frpc::render_frpc_toml(&frps, &user, &tunnel);
     let mut headers = HeaderMap::new();
     headers.insert(
         header::CONTENT_TYPE,
