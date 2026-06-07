@@ -22,6 +22,13 @@ export interface Tunnel {
   created_at: string
 }
 
+export interface TunnelWithTraffic {
+  tunnel: Tunnel
+  traffic_available: boolean
+  traffic_in: number
+  traffic_out: number
+}
+
 export interface FrpcResponse {
   tunnel: Tunnel
   frpc_toml: string

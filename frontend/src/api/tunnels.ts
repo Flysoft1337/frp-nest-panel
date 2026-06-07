@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { FrpcResponse, Tunnel } from './types'
+import type { FrpcResponse, Tunnel, TunnelWithTraffic } from './types'
 
 export interface TunnelInput {
   name: string
@@ -10,7 +10,7 @@ export interface TunnelInput {
 }
 
 export function listTunnels() {
-  return api<Tunnel[]>('/api/tunnels')
+  return api<TunnelWithTraffic[]>('/api/tunnels')
 }
 
 export function createTunnel(input: TunnelInput) {

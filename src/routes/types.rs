@@ -52,6 +52,14 @@ pub struct TunnelResponse {
     pub created_at: DateTime<FixedOffset>,
 }
 
+#[derive(Serialize)]
+pub struct TunnelWithTrafficResponse {
+    pub tunnel: TunnelResponse,
+    pub traffic_available: bool,
+    pub traffic_in: u64,
+    pub traffic_out: u64,
+}
+
 impl From<tunnels::Model> for TunnelResponse {
     fn from(tunnel: tunnels::Model) -> Self {
         Self {

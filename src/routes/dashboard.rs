@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use axum::{extract::State, response::IntoResponse, Json};
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
 
@@ -5,7 +7,8 @@ use crate::{
     auth::CurrentUser,
     entities::tunnels,
     error::AppResult,
-    routes::types::{DashboardSummaryResponse, TunnelResponse},
+    routes::types::{DashboardSummaryResponse, TunnelResponse, TunnelWithTrafficResponse},
+    services::frps,
     state::AppState,
 };
 
@@ -17,9 +20,31 @@ pub async fn tunnels(
         .filter(tunnels::Column::UserId.eq(user.id))
         .order_by_asc(tunnels::Column::CreatedAt)
         .all(&state.db)
-        .await?
+        .await?;
+    let frps_config = state.frps.read().await.clone();
+    let snapshot = frps::traffic_snapshot(&frps_config).await;
+    let traffic = snapshot
+        .proxies
         .into_iter()
-        .map(TunnelResponse::from)
+        .map(|proxy| {
+            (
+                (proxy.protocol, proxy.name),
+                (proxy.traffic_in, proxy.traffic_out),
+            )
+        })
+        .collect::<HashMap<_, _>>();
+    let tunnels = tunnels
+        .into_iter()
+        .map(|tunnel| {
+            let key = (tunnel.protocol.clone(), tunnel.name.clone());
+            let (traffic_in, traffic_out) = traffic.get(&key).copied().unwrap_or((0, 0));
+            TunnelWithTrafficResponse {
+                tunnel: TunnelResponse::from(tunnel),
+                traffic_available: snapshot.available,
+                traffic_in,
+                traffic_out,
+            }
+        })
         .collect::<Vec<_>>();
 
     Ok(Json(tunnels))

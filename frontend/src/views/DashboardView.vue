@@ -3,15 +3,22 @@ import { onMounted, ref } from 'vue'
 
 import { getDashboardSummary } from '../api/dashboard'
 import { deleteTunnel, listTunnels } from '../api/tunnels'
-import type { DashboardSummary, Tunnel } from '../api/types'
+import type { DashboardSummary, TunnelWithTraffic } from '../api/types'
 import ConfirmButton from '../components/ConfirmButton.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusPill from '../components/StatusPill.vue'
 
-const tunnels = ref<Tunnel[]>([])
+const tunnels = ref<TunnelWithTraffic[]>([])
 const summary = ref<DashboardSummary | null>(null)
 const loading = ref(true)
 const error = ref('')
+
+function formatBytes(value: number) {
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`
+  if (value < 1024 * 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MiB`
+  return `${(value / 1024 / 1024 / 1024).toFixed(1)} GiB`
+}
 
 async function load() {
   loading.value = true
@@ -78,19 +85,23 @@ onMounted(load)
 
     <div v-else class="table-wrap">
       <table class="data-table">
-        <thead><tr><th>名称</th><th>协议</th><th>本地</th><th>远程端口</th><th>操作</th></tr></thead>
+        <thead><tr><th>名称</th><th>协议</th><th>本地</th><th>远程端口</th><th>流量</th><th>操作</th></tr></thead>
         <tbody>
-          <tr v-for="tunnel in tunnels" :key="tunnel.id">
-            <td class="font-semibold text-white">{{ tunnel.name }}</td>
-            <td><StatusPill>{{ tunnel.protocol }}</StatusPill></td>
-            <td><code class="text-slate-300">{{ tunnel.local_host }}:{{ tunnel.local_port }}</code></td>
-            <td><code class="text-cyan-100">{{ tunnel.remote_port }}</code></td>
+          <tr v-for="row in tunnels" :key="row.tunnel.id">
+            <td class="font-semibold text-white">{{ row.tunnel.name }}</td>
+            <td><StatusPill>{{ row.tunnel.protocol }}</StatusPill></td>
+            <td><code class="text-slate-300">{{ row.tunnel.local_host }}:{{ row.tunnel.local_port }}</code></td>
+            <td><code class="text-cyan-100">{{ row.tunnel.remote_port }}</code></td>
+            <td>
+              <code v-if="row.traffic_available" class="text-cyan-100">↓ {{ formatBytes(row.traffic_in) }} / ↑ {{ formatBytes(row.traffic_out) }}</code>
+              <span v-else class="text-sm text-slate-500">暂无数据</span>
+            </td>
             <td>
               <div class="flex flex-wrap items-center gap-2">
-                <RouterLink class="btn-secondary" role="button" :to="`/tunnels/${tunnel.id}/edit`">编辑</RouterLink>
-                <RouterLink class="btn-secondary" role="button" :to="`/tunnels/${tunnel.id}/frpc`">预览</RouterLink>
-                <a class="btn-secondary" role="button" :href="`/tunnels/${tunnel.id}/frpc.toml`">下载</a>
-                <ConfirmButton message="确定删除这个隧道吗？" @confirm="remove(tunnel.id)">删除</ConfirmButton>
+                <RouterLink class="btn-secondary" role="button" :to="`/tunnels/${row.tunnel.id}/edit`">编辑</RouterLink>
+                <RouterLink class="btn-secondary" role="button" :to="`/tunnels/${row.tunnel.id}/frpc`">预览</RouterLink>
+                <a class="btn-secondary" role="button" :href="`/tunnels/${row.tunnel.id}/frpc.toml`">下载</a>
+                <ConfirmButton message="确定删除这个隧道吗？" @confirm="remove(row.tunnel.id)">删除</ConfirmButton>
               </div>
             </td>
           </tr>
