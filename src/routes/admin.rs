@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::atomic::Ordering};
 
 use axum::{
     extract::{Path, Query, State},
@@ -314,7 +314,9 @@ pub async fn frps_status(
     State(state): State<AppState>,
     AdminUser(_user): AdminUser,
 ) -> AppResult<impl IntoResponse> {
-    let frps = state.frps.read().await;
+    let frps = state.frps.read().await.clone();
+    let restarting = state.frps_restarting.load(Ordering::SeqCst);
+    let runtime_status = frps::runtime_status(&frps, restarting).await;
     Ok(Json(FrpsStatusResponse {
         server_addr: frps.server_addr.clone(),
         bind_port: frps.bind_port,
@@ -322,8 +324,14 @@ pub async fn frps_status(
         remote_port_min: frps.remote_port_min,
         remote_port_max: frps.remote_port_max,
         config_path: crate::services::frps::FRPS_CONFIG_PATH.to_owned(),
-        status: "unknown".to_owned(),
+        status: runtime_status.display_status.clone(),
+        state: runtime_status.state,
+        version: runtime_status.version,
+        display_status: runtime_status.display_status,
+        restarting,
         restart_command_configured: true,
+        upgrade_supported: false,
+        available_versions: Vec::new(),
     }))
 }
 
@@ -384,10 +392,26 @@ pub async fn update_frps(
     Ok(Json(OkResponse { ok: true }))
 }
 
-pub async fn restart_frps(AdminUser(_user): AdminUser) -> AppResult<impl IntoResponse> {
-    frps::restart_frps()
-        .await
-        .map_err(|error| AppError::BadRequest(format!("重启 frps 失败: {error}")))?;
+pub async fn restart_frps(
+    State(state): State<AppState>,
+    AdminUser(_user): AdminUser,
+) -> AppResult<impl IntoResponse> {
+    if state
+        .frps_restarting
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return Err(AppError::BadRequest("frps 正在重启".to_owned()));
+    }
+
+    let restarting = state.frps_restarting.clone();
+    tokio::spawn(async move {
+        if let Err(error) = frps::restart_frps().await {
+            tracing::error!(%error, "failed to restart frps");
+        }
+        restarting.store(false, Ordering::SeqCst);
+    });
+
     Ok(Json(OkResponse { ok: true }))
 }
 

@@ -136,7 +136,13 @@ pub struct FrpsStatusResponse {
     pub remote_port_max: i32,
     pub config_path: String,
     pub status: String,
+    pub state: String,
+    pub version: String,
+    pub display_status: String,
+    pub restarting: bool,
     pub restart_command_configured: bool,
+    pub upgrade_supported: bool,
+    pub available_versions: Vec<String>,
 }
 
 #[derive(Serialize)]

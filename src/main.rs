@@ -7,7 +7,7 @@ mod services;
 mod spa;
 mod state;
 
-use std::sync::Arc;
+use std::sync::{atomic::AtomicBool, Arc};
 
 use axum::{routing::get, Router};
 use migration::{Migrator, MigratorTrait};
@@ -49,6 +49,7 @@ async fn main() -> anyhow::Result<()> {
         config: config.clone(),
         db,
         frps: Arc::new(RwLock::new(frps_config.clone())),
+        frps_restarting: Arc::new(AtomicBool::new(false)),
     };
 
     let mut key_bytes = [0_u8; 64];

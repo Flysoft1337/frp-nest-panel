@@ -78,7 +78,13 @@ export interface FrpsStatus {
   remote_port_max: number
   config_path: string
   status: string
+  state: 'running' | 'stopped' | 'restarting' | 'unknown' | string
+  version: string
+  display_status: string
+  restarting: boolean
   restart_command_configured: boolean
+  upgrade_supported: boolean
+  available_versions: string[]
 }
 
 export interface FrpsUpdate {

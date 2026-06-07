@@ -45,11 +45,25 @@ async function restart() {
   message.value = ''
   try {
     await restartFrps()
-    await load()
-    message.value = 'frps 已提交重启'
+    await pollStatus()
+    message.value = 'frps 已重启'
   } catch (err) {
     error.value = err instanceof Error ? err.message : '重启失败'
   }
+}
+
+async function pollStatus() {
+  for (let index = 0; index < 10; index += 1) {
+    await load()
+    if (!status.value?.restarting) return
+    await new Promise((resolve) => window.setTimeout(resolve, 1000))
+  }
+}
+
+function statusTone(value: FrpsStatus) {
+  if (value.state === 'running') return 'success'
+  if (value.state === 'stopped') return 'danger'
+  return 'default'
 }
 
 onMounted(async () => {
@@ -65,10 +79,14 @@ onMounted(async () => {
   <PageHeader eyebrow="Admin" title="frps 管理" description="编辑本机 frps 配置。保存不会自动重启。" />
 
   <section v-if="status" class="card p-6">
-    <div class="grid gap-4 md:grid-cols-4">
+    <div class="grid gap-4 md:grid-cols-5">
       <div>
         <div class="text-sm text-slate-400">状态</div>
-        <div class="mt-2"><StatusPill>{{ status.status }}</StatusPill></div>
+        <div class="mt-2"><StatusPill :tone="statusTone(status)">{{ status.display_status }}</StatusPill></div>
+      </div>
+      <div>
+        <div class="text-sm text-slate-400">版本</div>
+        <div class="mt-2 font-mono text-cyan-100">{{ status.version }}</div>
       </div>
       <div>
         <div class="text-sm text-slate-400">配置文件</div>
@@ -79,8 +97,8 @@ onMounted(async () => {
         <div class="mt-2 text-white">{{ status.token_set ? '已设置' : '未设置' }}</div>
       </div>
       <div>
-        <div class="text-sm text-slate-400">重启命令</div>
-        <div class="mt-2 text-white">{{ status.restart_command_configured ? '已配置' : '未配置' }}</div>
+        <div class="text-sm text-slate-400">升级</div>
+        <div class="mt-2 text-white">{{ status.upgrade_supported ? '可用' : '暂未开放' }}</div>
       </div>
     </div>
   </section>
@@ -99,7 +117,7 @@ onMounted(async () => {
       </div>
       <div class="flex flex-wrap gap-3">
         <button class="btn-primary" type="submit">保存配置</button>
-        <ConfirmButton class-name="btn-danger" message="重启 frps 会影响所有隧道连接，确定继续吗？" @confirm="restart">重启 frps</ConfirmButton>
+        <ConfirmButton class-name="btn-danger" :busy="status?.restarting" :message="status?.restarting ? 'frps 正在重启' : '重启 frps 会影响所有隧道连接，确定继续吗？'" @confirm="restart">{{ status?.restarting ? '重启中' : '重启 frps' }}</ConfirmButton>
       </div>
     </form>
   </section>

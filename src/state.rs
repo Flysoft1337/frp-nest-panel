@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{atomic::AtomicBool, Arc};
 
 use sea_orm::DatabaseConnection;
 use tokio::sync::RwLock;
@@ -10,4 +10,5 @@ pub struct AppState {
     pub config: Config,
     pub db: DatabaseConnection,
     pub frps: Arc<RwLock<FrpsRuntimeConfig>>,
+    pub frps_restarting: Arc<AtomicBool>,
 }
