@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}frpc.toml - frp-nest-panel{% endblock %}
+{% block content %}
+<header class="row-between">
+  <h1>{{ tunnel.name }} 的 frpc.toml</h1>
+  <a role="button" href="/tunnels/{{ tunnel.id }}/frpc.toml">下载</a>
+</header>
+<textarea id="frpc-config" readonly rows="18">{{ frpc_toml }}</textarea>
+<button type="button" onclick="navigator.clipboard.writeText(document.getElementById('frpc-config').value)">复制配置</button>
+{% endblock %}

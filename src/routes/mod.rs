@@ -18,9 +18,14 @@ pub fn router() -> Router<AppState> {
         .route("/login", get(auth::login_page).post(auth::login))
         .route("/register", get(auth::register_page).post(auth::register))
         .route("/logout", post(auth::logout))
+        .route(
+            "/password",
+            get(auth::password_page).post(auth::change_password),
+        )
         .route("/dashboard", get(dashboard::dashboard))
         .route("/tunnels/new", get(tunnels::new_page).post(tunnels::create))
         .route("/tunnels/{id}/delete", post(tunnels::delete))
+        .route("/tunnels/{id}/frpc", get(tunnels::preview_frpc))
         .route("/tunnels/{id}/frpc.toml", get(tunnels::download_frpc))
         .route("/admin", get(admin::index))
         .route(
@@ -30,5 +35,9 @@ pub fn router() -> Router<AppState> {
         .route("/admin/users", get(admin::users))
         .route("/admin/users/{id}/disable", post(admin::disable_user))
         .route("/admin/users/{id}/enable", post(admin::enable_user))
+        .route(
+            "/admin/users/{id}/reset-password",
+            post(admin::reset_user_password),
+        )
         .route("/admin/tunnels", get(admin::all_tunnels))
 }

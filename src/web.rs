@@ -13,8 +13,15 @@ pub fn load_templates() -> Environment<'static> {
         .unwrap();
     env.add_template("register.html", include_str!("templates/register.html"))
         .unwrap();
+    env.add_template("password.html", include_str!("templates/password.html"))
+        .unwrap();
     env.add_template("dashboard.html", include_str!("templates/dashboard.html"))
         .unwrap();
+    env.add_template(
+        "frpc_preview.html",
+        include_str!("templates/frpc_preview.html"),
+    )
+    .unwrap();
     env.add_template("tunnel_new.html", include_str!("templates/tunnel_new.html"))
         .unwrap();
     env.add_template("admin.html", include_str!("templates/admin.html"))

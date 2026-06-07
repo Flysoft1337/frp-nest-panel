@@ -55,27 +55,37 @@ pub async fn create(
     let local_host = validation::local_host(&form.local_host)?;
     let local_port = validation::local_port(form.local_port)?;
 
-    let remote_port = ports::allocate_remote_port(
-        &state.db,
-        state.config.remote_port_min,
-        state.config.remote_port_max,
-    )
-    .await?;
+    for _ in 0..5 {
+        let remote_port = ports::allocate_remote_port(
+            &state.db,
+            state.config.remote_port_min,
+            state.config.remote_port_max,
+        )
+        .await?;
 
-    tunnels::ActiveModel {
-        id: Set(Uuid::new_v4()),
-        user_id: Set(user.id),
-        name: Set(name),
-        protocol: Set("tcp".to_owned()),
-        local_host: Set(local_host),
-        local_port: Set(local_port),
-        remote_port: Set(remote_port),
-        created_at: Set(Utc::now().fixed_offset()),
+        let result = tunnels::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            user_id: Set(user.id),
+            name: Set(name.clone()),
+            protocol: Set("tcp".to_owned()),
+            local_host: Set(local_host.clone()),
+            local_port: Set(local_port),
+            remote_port: Set(remote_port),
+            created_at: Set(Utc::now().fixed_offset()),
+        }
+        .insert(&state.db)
+        .await;
+
+        match result {
+            Ok(_) => return Ok(Redirect::to("/dashboard")),
+            Err(sea_orm::DbErr::Exec(error)) if error.to_string().contains("remote_port") => {
+                continue
+            }
+            Err(error) => return Err(error.into()),
+        }
     }
-    .insert(&state.db)
-    .await?;
 
-    Ok(Redirect::to("/dashboard"))
+    Err(AppError::BadRequest("远程端口分配冲突，请重试".to_owned()))
 }
 
 pub async fn delete(
@@ -91,6 +101,26 @@ pub async fn delete(
     }
     tunnels::Entity::delete_by_id(id).exec(&state.db).await?;
     Ok(Redirect::to("/dashboard"))
+}
+
+pub async fn preview_frpc(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(id): Path<Uuid>,
+) -> AppResult<impl IntoResponse> {
+    let Some(tunnel) = tunnels::Entity::find_by_id(id).one(&state.db).await? else {
+        return Err(AppError::NotFound);
+    };
+    if tunnel.user_id != user.id {
+        return Err(AppError::Forbidden);
+    }
+
+    let frpc_toml = frpc::render_frpc_toml(&state.config, &user, &tunnel);
+    web::render(
+        &state.templates,
+        "frpc_preview.html",
+        context! { user => user, tunnel => tunnel, frpc_toml => frpc_toml },
+    )
 }
 
 pub async fn download_frpc(

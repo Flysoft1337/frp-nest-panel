@@ -3,15 +3,20 @@
 {% block content %}
 <header class="row-between">
   <h1>邀请码</h1>
-  <form method="post" action="/admin/invites"><button type="submit">生成邀请码</button></form>
 </header>
+<form method="post" action="/admin/invites" class="grid">
+  <label>生成数量<input name="count" type="number" min="1" max="100" value="1" required></label>
+  <label>过期天数<input name="expires_days" type="number" min="0" placeholder="0 表示永不过期"></label>
+  <label>&nbsp;<button type="submit">生成邀请码</button></label>
+</form>
 <table>
-  <thead><tr><th>邀请码</th><th>使用状态</th><th>创建时间</th></tr></thead>
+  <thead><tr><th>邀请码</th><th>使用状态</th><th>过期时间</th><th>创建时间</th></tr></thead>
   <tbody>
   {% for invite in invites %}
     <tr>
       <td><code>{{ invite.code }}</code></td>
       <td>{% if invite.used_by %}已使用{% else %}未使用{% endif %}</td>
+      <td>{% if invite.expires_at %}{{ invite.expires_at }}{% else %}永不过期{% endif %}</td>
       <td>{{ invite.created_at }}</td>
     </tr>
   {% endfor %}

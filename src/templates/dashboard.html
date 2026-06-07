@@ -18,7 +18,8 @@
       <td>{{ tunnel.local_host }}:{{ tunnel.local_port }}</td>
       <td><code>{{ tunnel.remote_port }}</code></td>
       <td class="actions">
-        <a href="/tunnels/{{ tunnel.id }}/frpc.toml">下载 frpc.toml</a>
+        <a href="/tunnels/{{ tunnel.id }}/frpc">预览 frpc.toml</a>
+        <a href="/tunnels/{{ tunnel.id }}/frpc.toml">下载</a>
         <form method="post" action="/tunnels/{{ tunnel.id }}/delete" onsubmit="return confirm('确定删除这个隧道吗？');"><button class="secondary outline" type="submit">删除</button></form>
       </td>
     </tr>

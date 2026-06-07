@@ -10,7 +10,7 @@ use tower_sessions::Session;
 use uuid::Uuid;
 
 use crate::{
-    auth::{find_user_by_username, SESSION_USER_ID},
+    auth::{find_user_by_username, CurrentUser, SESSION_USER_ID},
     entities::{invite_codes, users},
     error::{AppError, AppResult},
     services::{password, validation},
@@ -34,6 +34,13 @@ pub struct RegisterForm {
     invite_code: String,
     username: String,
     password: String,
+}
+
+#[derive(Deserialize)]
+pub struct PasswordChangeForm {
+    current_password: String,
+    new_password: String,
+    confirm_password: String,
 }
 
 pub async fn login_page(State(state): State<AppState>) -> AppResult<impl IntoResponse> {
@@ -114,6 +121,33 @@ pub async fn register(
     active_invite.update(&state.db).await?;
 
     session.insert(SESSION_USER_ID, user_id).await?;
+    Ok(Redirect::to("/dashboard"))
+}
+
+pub async fn password_page(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+) -> AppResult<impl IntoResponse> {
+    web::render(&state.templates, "password.html", context! { user => user })
+}
+
+pub async fn change_password(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Form(form): Form<PasswordChangeForm>,
+) -> AppResult<impl IntoResponse> {
+    if !password::verify_password(&form.current_password, &user.password_hash)? {
+        return Err(AppError::BadRequest("当前密码错误".to_owned()));
+    }
+    validation::password(&form.new_password)?;
+    if form.new_password != form.confirm_password {
+        return Err(AppError::BadRequest("两次输入的新密码不一致".to_owned()));
+    }
+
+    let mut active: users::ActiveModel = user.into();
+    active.password_hash = Set(password::hash_password(&form.new_password)?);
+    active.update(&state.db).await?;
+
     Ok(Redirect::to("/dashboard"))
 }
 
