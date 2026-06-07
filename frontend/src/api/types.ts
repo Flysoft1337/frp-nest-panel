@@ -109,6 +109,11 @@ export interface DashboardSummary {
   tunnel_count: number
   user_max_tunnels: number
   remaining_tunnels: number
+  username: string
+  role: string
+  disabled: boolean
+  created_at: string
+  effective_max_tunnels: number
   frps_server_addr: string
   frps_bind_port: number
   remote_port_min: number

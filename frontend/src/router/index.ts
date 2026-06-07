@@ -13,6 +13,7 @@ const router = createRouter({
     { path: '/tunnels/:id/edit', component: () => import('../views/TunnelCreateView.vue') },
     { path: '/tunnels/:id/frpc', component: () => import('../views/FrpcPreviewView.vue') },
     { path: '/password', component: () => import('../views/PasswordView.vue') },
+    { path: '/profile', component: () => import('../views/ProfileView.vue') },
     { path: '/admin', component: () => import('../views/AdminHomeView.vue'), meta: { admin: true } },
     { path: '/admin/invites', component: () => import('../views/AdminInvitesView.vue'), meta: { admin: true } },
     { path: '/admin/users', component: () => import('../views/AdminUsersView.vue'), meta: { admin: true } },
