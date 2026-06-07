@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}我的隧道 - frp-lite-panel{% endblock %}
+{% block content %}
+<header class="row-between">
+  <h1>我的隧道</h1>
+  <a role="button" href="/tunnels/new">创建隧道</a>
+</header>
+{% if tunnels | length == 0 %}
+<p>还没有隧道。</p>
+{% else %}
+<table>
+  <thead><tr><th>名称</th><th>协议</th><th>本地</th><th>远程端口</th><th>操作</th></tr></thead>
+  <tbody>
+  {% for tunnel in tunnels %}
+    <tr>
+      <td>{{ tunnel.name }}</td>
+      <td>{{ tunnel.protocol }}</td>
+      <td>{{ tunnel.local_host }}:{{ tunnel.local_port }}</td>
+      <td><code>{{ tunnel.remote_port }}</code></td>
+      <td class="actions">
+        <a href="/tunnels/{{ tunnel.id }}/frpc.toml">下载 frpc.toml</a>
+        <form method="post" action="/tunnels/{{ tunnel.id }}/delete" onsubmit="return confirm('确定删除这个隧道吗？');"><button class="secondary outline" type="submit">删除</button></form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

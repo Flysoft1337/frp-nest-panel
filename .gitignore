@@ -1,0 +1,13 @@
+/target
+.env
+*.db
+*.sqlite
+*.sqlite3
+.DS_Store
+.idea
+.vscode
+*.pem
+*.key
+*.crt
+*.p12
+*.log

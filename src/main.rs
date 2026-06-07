@@ -1,0 +1,99 @@
+mod auth;
+mod config;
+mod entities;
+mod error;
+mod routes;
+mod services;
+mod state;
+mod web;
+
+use std::sync::Arc;
+
+use axum::Router;
+use migration::{Migrator, MigratorTrait};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, Database, EntityTrait};
+use tokio::net::TcpListener;
+use tower_http::{services::ServeDir, trace::TraceLayer};
+use tower_sessions::cookie::{time::Duration, Key};
+use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use uuid::Uuid;
+
+use crate::{config::Config, entities::users, services::password, state::AppState};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "frp_lite_panel=debug,tower_http=debug".into()),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+
+    let config = Config::from_env()?;
+    let db = Database::connect(&config.database_url).await?;
+    Migrator::up(&db, None).await?;
+    ensure_initial_admin(&db, &config).await?;
+
+    let state = AppState {
+        config: config.clone(),
+        db,
+        templates: Arc::new(web::load_templates()),
+    };
+
+    let mut key_bytes = [0_u8; 64];
+    for (index, byte) in config.session_secret.as_bytes().iter().take(64).enumerate() {
+        key_bytes[index] = *byte;
+    }
+    let key = Key::from(&key_bytes);
+    let session_layer = SessionManagerLayer::new(MemoryStore::default())
+        .with_secure(false)
+        .with_expiry(Expiry::OnInactivity(Duration::days(7)))
+        .with_signed(key);
+
+    let app = Router::new()
+        .merge(routes::router())
+        .nest_service("/static", ServeDir::new("src/static"))
+        .layer(session_layer)
+        .layer(TraceLayer::new_for_http())
+        .with_state(state);
+
+    let listener = TcpListener::bind(config.app_bind).await?;
+    tracing::info!(
+        bind = %config.app_bind,
+        frps_server_addr = %config.frps_server_addr,
+        frps_bind_port = config.frps_bind_port,
+        remote_port_min = config.remote_port_min,
+        remote_port_max = config.remote_port_max,
+        user_max_tunnels = config.user_max_tunnels,
+        "frp-lite-panel starting"
+    );
+    axum::serve(listener, app).await?;
+    Ok(())
+}
+
+async fn ensure_initial_admin(
+    db: &sea_orm::DatabaseConnection,
+    config: &Config,
+) -> anyhow::Result<()> {
+    if users::Entity::find_by_id(Uuid::nil())
+        .one(db)
+        .await?
+        .is_some()
+    {
+        return Ok(());
+    }
+
+    users::ActiveModel {
+        id: Set(Uuid::nil()),
+        username: Set(config.initial_admin_username.clone()),
+        password_hash: Set(password::hash_password(&config.initial_admin_password)?),
+        role: Set("admin".to_owned()),
+        disabled: Set(false),
+        created_at: Set(chrono::Utc::now().fixed_offset()),
+    }
+    .insert(db)
+    .await?;
+    Ok(())
+}

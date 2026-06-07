@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}管理 - frp-lite-panel{% endblock %}
+{% block content %}
+<h1>管理后台</h1>
+<div class="grid">
+  <a role="button" href="/admin/invites">邀请码</a>
+  <a role="button" href="/admin/users">用户</a>
+  <a role="button" href="/admin/tunnels">全部隧道</a>
+</div>
+
+<article>
+  <h2>当前配置</h2>
+  <ul>
+    <li>frps 地址：<code>{{ config.frps_server_addr }}:{{ config.frps_bind_port }}</code></li>
+    <li>远程端口范围：<code>{{ config.remote_port_min }}-{{ config.remote_port_max }}</code></li>
+    <li>每个用户最多隧道数：<code>{{ config.user_max_tunnels }}</code></li>
+  </ul>
+</article>
+{% endblock %}

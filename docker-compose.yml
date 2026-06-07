@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: frp_panel
+      POSTGRES_USER: frp_panel
+      POSTGRES_PASSWORD: frp_panel
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  frps:
+    image: snowdreamtech/frps:0.62.1
+    restart: unless-stopped
+    command: -c /etc/frp/frps.toml
+    volumes:
+      - ./frps/frps.example.toml:/etc/frp/frps.toml:ro
+    ports:
+      - "7000:7000"
+      - "20000-30000:20000-30000"
+
+  panel:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres-data:

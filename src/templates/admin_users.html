@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}用户 - frp-lite-panel{% endblock %}
+{% block content %}
+<h1>用户</h1>
+<table>
+  <thead><tr><th>用户名</th><th>角色</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
+  <tbody>
+  {% for item in users %}
+    <tr>
+      <td>{{ item.username }}</td>
+      <td>{{ item.role }}</td>
+      <td>{% if item.disabled %}已禁用{% else %}正常{% endif %}</td>
+      <td>{{ item.created_at }}</td>
+      <td>
+        {% if item.id != user.id %}
+          {% if item.disabled %}
+          <form method="post" action="/admin/users/{{ item.id }}/enable"><button type="submit">启用</button></form>
+          {% else %}
+          <form method="post" action="/admin/users/{{ item.id }}/disable"><button class="secondary outline" type="submit">禁用</button></form>
+          {% endif %}
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

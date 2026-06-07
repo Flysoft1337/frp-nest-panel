@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}frp-lite-panel{% endblock %}</title>
+  <link rel="stylesheet" href="/static/pico.min.css">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <main class="container">
+    <nav>
+      <ul><li><strong>frp-lite-panel</strong></li></ul>
+      <ul>
+        {% if user is defined %}
+        <li><a href="/dashboard">隧道</a></li>
+        {% if user.role == "admin" %}<li><a href="/admin">管理</a></li>{% endif %}
+        <li>
+          <form method="post" action="/logout"><button class="secondary outline" type="submit">退出</button></form>
+        </li>
+        {% endif %}
+      </ul>
+    </nav>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
