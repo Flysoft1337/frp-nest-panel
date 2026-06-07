@@ -12,12 +12,10 @@ services:
   frps:
     image: snowdreamtech/frps:0.62.1
     restart: unless-stopped
+    network_mode: host
     command: -c /etc/frp/frps.toml
     volumes:
       - ./frps/frps.toml:/etc/frp/frps.toml:ro
-    ports:
-      - "7000:7000"
-      - "20000-30000:20000-30000"
 
   panel:
     build: .

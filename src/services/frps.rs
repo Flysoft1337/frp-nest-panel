@@ -44,8 +44,7 @@ pub async fn load_runtime_config(config: &Config) -> Result<FrpsRuntimeConfig> {
         let content = tokio::fs::read_to_string(FRPS_CONFIG_PATH)
             .await
             .with_context(|| format!("failed to read {FRPS_CONFIG_PATH}"))?;
-        let value = content
-            .parse::<toml::Value>()
+        let value: toml::Value = toml::from_str(&content)
             .with_context(|| format!("failed to parse {FRPS_CONFIG_PATH}"))?;
 
         if let Some(bind_port) = value.get("bindPort").and_then(toml::Value::as_integer) {
