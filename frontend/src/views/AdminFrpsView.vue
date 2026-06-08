@@ -227,6 +227,9 @@ onMounted(async () => {
           <FormField label="HTTP vhost 端口"><input v-model="form.vhost_http_port" max="65535" min="1" placeholder="留空关闭" type="number" /></FormField>
           <FormField label="HTTPS vhost 端口"><input v-model="form.vhost_https_port" max="65535" min="1" placeholder="留空关闭" type="number" /></FormField>
         </div>
+        <p v-if="caddyForm.enabled" class="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
+          Caddy 已接管公网 80/443。HTTPS vhost 不要填写 443；如果要让 frp HTTPS 域名隧道共用 443，需要另外做 Caddy 分流。
+        </p>
       </section>
 
       <section class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
@@ -259,8 +262,10 @@ onMounted(async () => {
         <div>当前状态：{{ caddy.enabled ? '启用' : '关闭' }}</div>
         <div>访问域名：<code class="text-cyan-100">{{ caddy.domain || '未配置' }}</code></div>
         <div>反代后端：<code class="text-cyan-100">{{ caddy.upstream }}</code></div>
+        <div>面板监听：<code class="text-cyan-100">{{ caddy.app_bind }}</code></div>
         <div>配置路径：<code class="text-cyan-100">{{ caddy.config_path }}</code></div>
         <div>命令状态：<span :class="caddy.available ? 'text-emerald-100' : 'text-red-100'">{{ caddy.available ? 'Caddy 可用' : 'Caddy 未安装或不可用' }}</span></div>
+        <div>暴露状态：<span :class="caddy.app_bind_local ? 'text-emerald-100' : 'text-red-100'">{{ caddy.app_bind_local ? '面板已仅监听本机' : '面板仍可能公网暴露，请把 APP_BIND 改为 127.0.0.1:8080 后重启面板' }}</span></div>
       </div>
       <div class="grid items-start gap-4 md:grid-cols-2">
         <FormField label="启用 Caddy 接管"><SelectField v-model="caddyForm.enabled" :options="caddyEnabledOptions" /></FormField>
@@ -289,17 +294,22 @@ onMounted(async () => {
         <div>证书域名：<span class="text-cyan-100">{{ panelTls.domains.length ? panelTls.domains.join(', ') : '未上传' }}</span></div>
         <div v-if="panelTls.not_after">过期时间：{{ panelTls.not_after }}</div>
       </div>
-      <div class="grid items-start gap-4 md:grid-cols-2">
-        <FormField label="启用 HTTPS"><SelectField v-model="panelTlsForm.enabled" :options="panelTlsEnabledOptions" /></FormField>
-        <FormField label="访问域名" note="例如 frp.let2.dev，证书必须覆盖这个域名"><input v-model="panelTlsForm.domain" placeholder="frp.let2.dev" /></FormField>
-        <FormField label="HTTPS 监听地址" note="必须是 IP:端口，例如 0.0.0.0:443"><input v-model="panelTlsForm.bind" required placeholder="0.0.0.0:443" /></FormField>
-        <FormField label="证书 PEM"><textarea v-model="panelTlsForm.certificate_pem" rows="6" placeholder="留空表示不修改" /></FormField>
-        <FormField label="私钥 PEM"><textarea v-model="panelTlsForm.private_key_pem" rows="6" placeholder="留空表示不修改" /></FormField>
+      <div v-if="caddyForm.enabled" class="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
+        Caddy 已启用，直接 HTTPS 已收起。需要切回面板直接监听 HTTPS 时，先关闭 Caddy 接管。
       </div>
-      <div class="flex flex-wrap gap-3">
-        <button class="btn-primary" type="submit">保存面板 HTTPS</button>
-        <ConfirmButton class-name="btn-danger" message="重启面板会短暂中断管理页面，确定继续吗？" @confirm="restartPanelService">重启面板</ConfirmButton>
-      </div>
+      <template v-else>
+        <div class="grid items-start gap-4 md:grid-cols-2">
+          <FormField label="启用 HTTPS"><SelectField v-model="panelTlsForm.enabled" :options="panelTlsEnabledOptions" /></FormField>
+          <FormField label="访问域名" note="例如 frp.let2.dev，证书必须覆盖这个域名"><input v-model="panelTlsForm.domain" placeholder="frp.let2.dev" /></FormField>
+          <FormField label="HTTPS 监听地址" note="必须是 IP:端口，例如 0.0.0.0:443"><input v-model="panelTlsForm.bind" required placeholder="0.0.0.0:443" /></FormField>
+          <FormField label="证书 PEM"><textarea v-model="panelTlsForm.certificate_pem" rows="6" placeholder="留空表示不修改" /></FormField>
+          <FormField label="私钥 PEM"><textarea v-model="panelTlsForm.private_key_pem" rows="6" placeholder="留空表示不修改" /></FormField>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <button class="btn-primary" type="submit">保存面板 HTTPS</button>
+          <ConfirmButton class-name="btn-danger" message="重启面板会短暂中断管理页面，确定继续吗？" @confirm="restartPanelService">重启面板</ConfirmButton>
+        </div>
+      </template>
     </form>
   </section>
 </template>

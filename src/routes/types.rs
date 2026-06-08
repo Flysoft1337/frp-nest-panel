@@ -225,6 +225,8 @@ pub struct CaddyResponse {
     pub config_path: String,
     pub available: bool,
     pub upstream: String,
+    pub app_bind: String,
+    pub app_bind_local: bool,
 }
 
 #[derive(Serialize)]

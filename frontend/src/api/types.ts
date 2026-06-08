@@ -157,6 +157,8 @@ export interface CaddyStatus {
   config_path: string
   available: boolean
   upstream: string
+  app_bind: string
+  app_bind_local: boolean
 }
 
 export interface ConfigResponse {

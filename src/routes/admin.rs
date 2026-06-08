@@ -658,6 +658,8 @@ async fn caddy_response(
         config_path: caddy::CADDY_CONFIG_PATH.to_owned(),
         available: caddy::caddy_available().await,
         upstream: caddy::upstream_from_bind(upstream),
+        app_bind: upstream.to_string(),
+        app_bind_local: upstream.ip().is_loopback(),
     }
 }
 
