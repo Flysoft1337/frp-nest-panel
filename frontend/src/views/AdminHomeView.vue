@@ -7,6 +7,7 @@ import AdminNav from '../components/AdminNav.vue'
 import AlertBox from '../components/AlertBox.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatCard from '../components/StatCard.vue'
+import StatusPill from '../components/StatusPill.vue'
 
 const config = ref<ConfigResponse | null>(null)
 const summary = ref<AdminSummary | null>(null)
@@ -47,15 +48,24 @@ onMounted(async () => {
     <StatCard label="端口占用" :value="`${summary.used_remote_port_count} / ${summary.remote_port_capacity}`" />
   </section>
 
-  <section v-if="traffic" class="card mt-6 p-6">
-    <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-      <div>
-        <h2 class="text-xl font-bold text-white">总流量</h2>
-        <p class="text-sm text-slate-400">{{ traffic.available ? '来自 frps dashboard 的真实数据。' : 'frps dashboard 数据源未配置或不可用。' }}</p>
+  <section v-if="traffic" class="card mt-6 overflow-hidden p-0">
+    <div class="border-b border-white/10 bg-cyan-300/[0.04] px-6 py-5">
+      <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 class="text-xl font-bold text-white">总流量</h2>
+          <p class="text-sm text-slate-400">{{ traffic.available ? '来自 frps dashboard 的真实数据。' : 'frps dashboard 数据源未配置或不可用。' }}</p>
+        </div>
+        <StatusPill :tone="traffic.available ? 'success' : 'default'">{{ traffic.available ? '数据可用' : '未接入' }}</StatusPill>
       </div>
-      <div class="grid gap-3 text-sm md:grid-cols-2">
-        <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3"><span class="text-slate-400">入站</span><div class="font-mono text-cyan-100">{{ formatBytes(traffic.total_traffic_in) }}</div></div>
-        <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3"><span class="text-slate-400">出站</span><div class="font-mono text-cyan-100">{{ formatBytes(traffic.total_traffic_out) }}</div></div>
+    </div>
+    <div class="grid gap-3 p-6 text-sm md:grid-cols-2">
+      <div class="rounded-3xl border border-white/10 bg-slate-950/30 px-5 py-4">
+        <span class="text-slate-400">入站</span>
+        <div class="mt-2 font-mono text-2xl font-black text-cyan-100">{{ formatBytes(traffic.total_traffic_in) }}</div>
+      </div>
+      <div class="rounded-3xl border border-white/10 bg-slate-950/30 px-5 py-4">
+        <span class="text-slate-400">出站</span>
+        <div class="mt-2 font-mono text-2xl font-black text-cyan-100">{{ formatBytes(traffic.total_traffic_out) }}</div>
       </div>
     </div>
   </section>
@@ -84,11 +94,26 @@ onMounted(async () => {
   </div>
 
   <section v-if="config" class="card mt-6 p-6">
-    <h2 class="text-xl font-bold text-white">当前配置</h2>
-    <dl class="mt-4 grid gap-3 text-sm">
-      <div class="flex justify-between gap-4 border-b border-white/10 pb-3"><dt class="text-slate-400">frps 地址</dt><dd class="font-mono text-cyan-100">{{ config.frps_server_addr }}:{{ config.frps_bind_port }}</dd></div>
-      <div class="flex justify-between gap-4 border-b border-white/10 pb-3"><dt class="text-slate-400">远程端口范围</dt><dd class="font-mono text-cyan-100">{{ config.remote_port_min }}-{{ config.remote_port_max }}</dd></div>
-      <div class="flex justify-between gap-4"><dt class="text-slate-400">每个用户最多隧道数</dt><dd class="font-mono text-cyan-100">{{ config.user_max_tunnels }}</dd></div>
+    <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="text-xl font-bold text-white">当前配置</h2>
+        <p class="mt-1 text-sm text-slate-400">这些值会影响用户创建隧道和下载 frpc 配置。</p>
+      </div>
+      <RouterLink class="btn-secondary" role="button" to="/admin/frps">编辑配置</RouterLink>
+    </div>
+    <dl class="grid gap-3 text-sm md:grid-cols-3">
+      <div class="rounded-3xl border border-white/10 bg-white/[0.03] px-4 py-3">
+        <dt class="text-slate-400">frps 地址</dt>
+        <dd class="mt-2 break-all font-mono text-cyan-100">{{ config.frps_server_addr }}:{{ config.frps_bind_port }}</dd>
+      </div>
+      <div class="rounded-3xl border border-white/10 bg-white/[0.03] px-4 py-3">
+        <dt class="text-slate-400">远程端口范围</dt>
+        <dd class="mt-2 font-mono text-cyan-100">{{ config.remote_port_min }}-{{ config.remote_port_max }}</dd>
+      </div>
+      <div class="rounded-3xl border border-white/10 bg-white/[0.03] px-4 py-3">
+        <dt class="text-slate-400">每个用户最多隧道数</dt>
+        <dd class="mt-2 font-mono text-cyan-100">{{ config.user_max_tunnels }}</dd>
+      </div>
     </dl>
   </section>
 </template>
