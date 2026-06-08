@@ -105,6 +105,10 @@ pub async fn summary(
         .count(&state.db)
         .await?;
     let tunnel_count = tunnels::Entity::find().count(&state.db).await?;
+    let used_remote_port_count = tunnels::Entity::find()
+        .filter(tunnels::Column::RemotePort.is_not_null())
+        .count(&state.db)
+        .await?;
     let invite_count = invite_codes::Entity::find().count(&state.db).await?;
     let unused_invite_count = invite_codes::Entity::find()
         .filter(invite_codes::Column::UsedBy.is_null())
@@ -119,7 +123,7 @@ pub async fn summary(
         tunnel_count,
         invite_count,
         unused_invite_count,
-        used_remote_port_count: tunnel_count,
+        used_remote_port_count,
         remote_port_capacity,
     }))
 }

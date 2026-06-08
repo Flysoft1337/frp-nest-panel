@@ -288,7 +288,7 @@ pub async fn traffic_snapshot(config: &FrpsRuntimeConfig) -> FrpsTrafficSnapshot
     }
 
     let mut proxies = Vec::new();
-    for protocol in ["tcp", "udp"] {
+    for protocol in ["tcp", "udp", "http", "https"] {
         let Ok(response) = get_dashboard(config, &format!("/api/proxy/{protocol}")).await else {
             return FrpsTrafficSnapshot {
                 available: false,

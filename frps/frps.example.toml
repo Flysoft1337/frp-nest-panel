@@ -1,5 +1,13 @@
 bindPort = 7000
+vhostHTTPPort = 8080
+vhostHTTPSPort = 8443
 
 [auth]
 method = "token"
 token = "change-this-frps-token"
+
+[webServer]
+addr = "127.0.0.1"
+port = 7500
+user = "admin"
+password = "change-this-dashboard-password"
