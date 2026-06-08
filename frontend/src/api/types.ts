@@ -15,10 +15,13 @@ export interface Tunnel {
   id: string
   user_id: string
   name: string
-  protocol: 'tcp' | 'udp' | string
+  protocol: 'tcp' | 'udp' | 'http' | 'https' | string
   local_host: string
   local_port: number
-  remote_port: number
+  remote_port: number | null
+  custom_domain: string | null
+  tls_mode: string | null
+  certificate_id: string | null
   created_at: string
 }
 
@@ -111,6 +114,8 @@ export interface FrpsStatus {
   dashboard_user: string
   dashboard_configured: boolean
   dashboard_available: boolean
+  vhost_http_port: number | null
+  vhost_https_port: number | null
 }
 
 export interface FrpsUpdate {
@@ -123,6 +128,26 @@ export interface FrpsUpdate {
   dashboard_port: number | null
   dashboard_user: string
   dashboard_password: string
+  vhost_http_port: number | null
+  vhost_https_port: number | null
+}
+
+export interface CertificateInfo {
+  id: string
+  name: string
+  domains: string[]
+  not_before: string
+  not_after: string
+  fingerprint_sha256: string
+  created_at: string
+}
+
+export interface PanelTlsStatus {
+  enabled: boolean
+  bind: string
+  domains: string[]
+  not_after: string | null
+  fingerprint_sha256: string
 }
 
 export interface ConfigResponse {

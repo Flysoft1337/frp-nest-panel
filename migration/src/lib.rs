@@ -4,6 +4,7 @@ mod m20260605_000001_create_users;
 mod m20260605_000002_create_invite_codes;
 mod m20260605_000003_create_tunnels;
 mod m20260608_000004_add_user_max_tunnels;
+mod m20260608_000005_add_domain_tunnels_and_certificates;
 
 pub struct Migrator;
 
@@ -15,6 +16,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260605_000002_create_invite_codes::Migration),
             Box::new(m20260605_000003_create_tunnels::Migration),
             Box::new(m20260608_000004_add_user_max_tunnels::Migration),
+            Box::new(m20260608_000005_add_domain_tunnels_and_certificates::Migration),
         ]
     }
 }

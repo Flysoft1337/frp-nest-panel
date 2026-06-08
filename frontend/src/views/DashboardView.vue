@@ -46,7 +46,7 @@ onMounted(load)
 </script>
 
 <template>
-  <PageHeader eyebrow="Dashboard" title="我的隧道" description="创建和管理你的 TCP/UDP frp 隧道。">
+  <PageHeader eyebrow="Dashboard" title="我的隧道" description="创建和管理 TCP、UDP、HTTP 和 HTTPS frp 隧道。">
     <RouterLink class="btn-primary" role="button" to="/tunnels/new">创建隧道</RouterLink>
   </PageHeader>
 
@@ -85,13 +85,17 @@ onMounted(load)
 
     <div v-else class="table-wrap">
       <table class="data-table">
-        <thead><tr><th>名称</th><th>协议</th><th>本地</th><th>远程端口</th><th>流量</th><th>操作</th></tr></thead>
+        <thead><tr><th>名称</th><th>协议</th><th>本地</th><th>入口</th><th>流量</th><th>操作</th></tr></thead>
         <tbody>
           <tr v-for="row in tunnels" :key="row.tunnel.id">
             <td class="font-semibold text-white">{{ row.tunnel.name }}</td>
             <td><StatusPill>{{ row.tunnel.protocol }}</StatusPill></td>
             <td><code class="text-slate-300">{{ row.tunnel.local_host }}:{{ row.tunnel.local_port }}</code></td>
-            <td><code class="text-cyan-100">{{ row.tunnel.remote_port }}</code></td>
+            <td>
+              <code v-if="row.tunnel.remote_port" class="text-cyan-100">{{ row.tunnel.remote_port }}</code>
+              <a v-else-if="row.tunnel.custom_domain" class="break-all text-cyan-100" :href="`${row.tunnel.protocol}://${row.tunnel.custom_domain}`" target="_blank">{{ row.tunnel.protocol }}://{{ row.tunnel.custom_domain }}</a>
+              <span v-else class="text-sm text-slate-500">未配置</span>
+            </td>
             <td>
               <code v-if="row.traffic_available" class="text-cyan-100">↓ {{ formatBytes(row.traffic_in) }} / ↑ {{ formatBytes(row.traffic_out) }}</code>
               <span v-else class="text-sm text-slate-500">暂无数据</span>
@@ -101,6 +105,7 @@ onMounted(load)
                 <RouterLink class="btn-secondary" role="button" :to="`/tunnels/${row.tunnel.id}/edit`">编辑</RouterLink>
                 <RouterLink class="btn-secondary" role="button" :to="`/tunnels/${row.tunnel.id}/frpc`">预览</RouterLink>
                 <a class="btn-secondary" role="button" :href="`/tunnels/${row.tunnel.id}/frpc.toml`">下载</a>
+                <a v-if="row.tunnel.tls_mode === 'uploaded_cert'" class="btn-secondary" role="button" :href="`/tunnels/${row.tunnel.id}/frpc.zip`">配置包</a>
                 <ConfirmButton message="确定删除这个隧道吗？" @confirm="remove(row.tunnel.id)">删除</ConfirmButton>
               </div>
             </td>

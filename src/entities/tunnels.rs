@@ -11,19 +11,33 @@ pub struct Model {
     pub protocol: String,
     pub local_host: String,
     pub local_port: i32,
-    #[sea_orm(unique)]
-    pub remote_port: i32,
+    pub remote_port: Option<i32>,
+    pub custom_domain: Option<String>,
+    pub tls_mode: Option<String>,
+    pub certificate_id: Option<Uuid>,
     pub created_at: DateTimeWithTimeZone,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
+        belongs_to = "super::certificates::Entity",
+        from = "Column::CertificateId",
+        to = "super::certificates::Column::Id"
+    )]
+    Certificate,
+    #[sea_orm(
         belongs_to = "super::users::Entity",
         from = "Column::UserId",
         to = "super::users::Column::Id"
     )]
     User,
+}
+
+impl Related<super::certificates::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Certificate.def()
+    }
 }
 
 impl Related<super::users::Entity> for Entity {

@@ -35,6 +35,7 @@ onMounted(load)
 <template>
   <PageHeader eyebrow="frpc.toml" :title="data?.tunnel.name || '配置预览'" description="复制或下载这个隧道的 frpc 配置。">
     <a v-if="data" class="btn-primary" role="button" :href="`/tunnels/${data.tunnel.id}/frpc.toml`">下载</a>
+    <a v-if="data?.tunnel.tls_mode === 'uploaded_cert'" class="btn-secondary" role="button" :href="`/tunnels/${data.tunnel.id}/frpc.zip`">下载配置包</a>
   </PageHeader>
 
   <section class="card p-6">

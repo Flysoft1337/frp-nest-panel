@@ -7,6 +7,9 @@ export interface TunnelInput {
   local_host: string
   local_port: number
   remote_port?: number | null
+  custom_domain?: string | null
+  tls_mode?: string | null
+  certificate_id?: string | null
 }
 
 export function listTunnels() {

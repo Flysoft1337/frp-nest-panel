@@ -75,5 +75,8 @@ pub enum Tunnels {
     LocalHost,
     LocalPort,
     RemotePort,
+    CustomDomain,
+    TlsMode,
+    CertificateId,
     CreatedAt,
 }

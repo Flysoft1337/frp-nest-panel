@@ -6,6 +6,7 @@ import type {
   ConfigResponse,
   FrpsStatus,
   FrpsUpdate,
+  PanelTlsStatus,
   Invite,
   ListParams,
   PageResponse,
@@ -93,4 +94,17 @@ export function updateFrps(form: FrpsUpdate) {
 
 export function restartFrps() {
   return api<{ ok: boolean }>('/api/admin/frps/restart', { method: 'POST' })
+}
+
+export function getPanelTls() {
+  return api<PanelTlsStatus>('/api/admin/panel-tls')
+}
+
+export function updatePanelTls(form: {
+  enabled: boolean
+  bind: string
+  certificate_pem?: string | null
+  private_key_pem?: string | null
+}) {
+  return api<PanelTlsStatus>('/api/admin/panel-tls', { method: 'PUT', json: form })
 }

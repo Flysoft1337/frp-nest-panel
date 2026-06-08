@@ -32,7 +32,7 @@ pub async fn allocate_remote_port(db: &DatabaseConnection, min: i32, max: i32) -
         .all(db)
         .await?
         .into_iter()
-        .map(|tunnel| tunnel.remote_port)
+        .filter_map(|tunnel| tunnel.remote_port)
         .collect::<std::collections::HashSet<_>>();
 
     (min..=max)

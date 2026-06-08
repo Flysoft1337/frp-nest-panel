@@ -23,6 +23,8 @@ pub struct FrpsRuntimeConfig {
     pub dashboard_port: Option<u16>,
     pub dashboard_user: String,
     pub dashboard_password: String,
+    pub vhost_http_port: Option<u16>,
+    pub vhost_https_port: Option<u16>,
 }
 
 pub struct FrpsRuntimeStatus {
@@ -64,12 +66,20 @@ struct FrpsPanelToml<'a> {
     dashboard_user: &'a str,
     #[serde(rename = "dashboardPassword")]
     dashboard_password: &'a str,
+    #[serde(rename = "vhostHTTPPort")]
+    vhost_http_port: Option<u16>,
+    #[serde(rename = "vhostHTTPSPort")]
+    vhost_https_port: Option<u16>,
 }
 
 #[derive(Serialize)]
 struct FrpsToml<'a> {
     #[serde(rename = "bindPort")]
     bind_port: u16,
+    #[serde(rename = "vhostHTTPPort", skip_serializing_if = "Option::is_none")]
+    vhost_http_port: Option<u16>,
+    #[serde(rename = "vhostHTTPSPort", skip_serializing_if = "Option::is_none")]
+    vhost_https_port: Option<u16>,
     auth: FrpsTomlAuth<'a>,
     #[serde(rename = "webServer", skip_serializing_if = "Option::is_none")]
     web_server: Option<FrpsTomlWebServer<'a>>,
@@ -100,6 +110,8 @@ pub async fn load_runtime_config(config: &Config) -> Result<FrpsRuntimeConfig> {
         dashboard_port: None,
         dashboard_user: String::new(),
         dashboard_password: String::new(),
+        vhost_http_port: None,
+        vhost_https_port: None,
     };
 
     if Path::new(FRPS_CONFIG_PATH).exists() {
@@ -111,6 +123,17 @@ pub async fn load_runtime_config(config: &Config) -> Result<FrpsRuntimeConfig> {
 
         if let Some(bind_port) = value.get("bindPort").and_then(toml::Value::as_integer) {
             runtime.bind_port = u16::try_from(bind_port).context("frps bindPort is invalid")?;
+        }
+        if let Some(port) = value.get("vhostHTTPPort").and_then(toml::Value::as_integer) {
+            runtime.vhost_http_port =
+                Some(u16::try_from(port).context("vhostHTTPPort is invalid")?);
+        }
+        if let Some(port) = value
+            .get("vhostHTTPSPort")
+            .and_then(toml::Value::as_integer)
+        {
+            runtime.vhost_https_port =
+                Some(u16::try_from(port).context("vhostHTTPSPort is invalid")?);
         }
         if let Some(token) = value
             .get("auth")
@@ -173,6 +196,17 @@ pub async fn load_runtime_config(config: &Config) -> Result<FrpsRuntimeConfig> {
         {
             runtime.dashboard_password = dashboard_password.to_owned();
         }
+        if let Some(port) = value.get("vhostHTTPPort").and_then(toml::Value::as_integer) {
+            runtime.vhost_http_port =
+                Some(u16::try_from(port).context("vhostHTTPPort is invalid")?);
+        }
+        if let Some(port) = value
+            .get("vhostHTTPSPort")
+            .and_then(toml::Value::as_integer)
+        {
+            runtime.vhost_https_port =
+                Some(u16::try_from(port).context("vhostHTTPSPort is invalid")?);
+        }
     } else {
         write_panel_config(&runtime).await?;
     }
@@ -195,6 +229,8 @@ pub async fn write_frps_config(config: &FrpsRuntimeConfig) -> Result<()> {
 
     let content = toml::to_string_pretty(&FrpsToml {
         bind_port: config.bind_port,
+        vhost_http_port: config.vhost_http_port,
+        vhost_https_port: config.vhost_https_port,
         auth: FrpsTomlAuth {
             method: "token",
             token: &config.auth_token,
@@ -227,6 +263,8 @@ pub async fn write_panel_config(config: &FrpsRuntimeConfig) -> Result<()> {
         dashboard_port: config.dashboard_port,
         dashboard_user: &config.dashboard_user,
         dashboard_password: &config.dashboard_password,
+        vhost_http_port: config.vhost_http_port,
+        vhost_https_port: config.vhost_https_port,
     })?;
     tokio::fs::write(FRPS_PANEL_CONFIG_PATH, content)
         .await

@@ -72,6 +72,36 @@ async fn main() -> anyhow::Result<()> {
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 
+    let panel_tls = crate::services::panel_tls::load_config()
+        .await
+        .unwrap_or_default();
+    if panel_tls.enabled {
+        let tls_app = app.clone();
+        let tls_bind = panel_tls.bind.clone();
+        tokio::spawn(async move {
+            let Ok(config) = axum_server::tls_rustls::RustlsConfig::from_pem_file(
+                crate::services::panel_tls::PANEL_TLS_CERT_PATH,
+                crate::services::panel_tls::PANEL_TLS_KEY_PATH,
+            )
+            .await
+            else {
+                tracing::error!("failed to load panel TLS certificate");
+                return;
+            };
+            let Ok(addr) = tls_bind.parse() else {
+                tracing::error!(bind = %tls_bind, "invalid panel TLS bind address");
+                return;
+            };
+            tracing::info!(bind = %tls_bind, "frp-nest-panel HTTPS starting");
+            if let Err(error) = axum_server::bind_rustls(addr, config)
+                .serve(tls_app.into_make_service())
+                .await
+            {
+                tracing::error!(%error, "panel HTTPS server stopped");
+            }
+        });
+    }
+
     let listener = TcpListener::bind(config.app_bind).await?;
     tracing::info!(
         bind = %config.app_bind,

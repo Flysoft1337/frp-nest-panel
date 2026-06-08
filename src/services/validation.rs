@@ -51,8 +51,47 @@ pub fn local_host(value: &str) -> AppResult<String> {
 
 pub fn tunnel_protocol(value: &str) -> AppResult<String> {
     let value = value.trim().to_ascii_lowercase();
-    if value != "tcp" && value != "udp" {
-        return Err(AppError::BadRequest("隧道协议只能是 tcp 或 udp".to_owned()));
+    if !matches!(value.as_str(), "tcp" | "udp" | "http" | "https") {
+        return Err(AppError::BadRequest(
+            "隧道协议只能是 tcp、udp、http 或 https".to_owned(),
+        ));
+    }
+    Ok(value)
+}
+
+pub fn domain(value: &str) -> AppResult<String> {
+    let value = value.trim().trim_end_matches('.').to_ascii_lowercase();
+    if value.is_empty() || value.len() > 253 {
+        return Err(AppError::BadRequest("域名长度不合法".to_owned()));
+    }
+    if value.contains("://")
+        || value.contains('/')
+        || value.contains('?')
+        || value.contains('#')
+        || value.contains(':')
+    {
+        return Err(AppError::BadRequest(
+            "域名不能包含协议、端口或路径".to_owned(),
+        ));
+    }
+    if value == "localhost" || !value.contains('.') || value.parse::<std::net::IpAddr>().is_ok() {
+        return Err(AppError::BadRequest("域名不合法".to_owned()));
+    }
+    for label in value.split('.') {
+        if label.is_empty() || label.len() > 63 {
+            return Err(AppError::BadRequest("域名不合法".to_owned()));
+        }
+        if label.starts_with('-') || label.ends_with('-') {
+            return Err(AppError::BadRequest("域名不合法".to_owned()));
+        }
+        if !label
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+        {
+            return Err(AppError::BadRequest(
+                "域名只能包含小写字母、数字和短横线".to_owned(),
+            ));
+        }
     }
     Ok(value)
 }

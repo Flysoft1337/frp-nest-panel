@@ -54,7 +54,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <PageHeader eyebrow="Admin" title="全部隧道" description="查看所有用户创建的 TCP/UDP 隧道。" />
+  <PageHeader eyebrow="Admin" title="全部隧道" description="查看所有用户创建的端口和域名隧道。" />
   <AdminNav />
 
   <section class="card p-6">
@@ -64,11 +64,13 @@ onMounted(async () => {
     </div>
 
     <Toolbar>
-      <input v-model="q" placeholder="搜索名称、本地地址、远程端口或用户名" />
+      <input v-model="q" placeholder="搜索名称、本地地址、远程端口、域名或用户名" />
       <select v-model="status">
         <option value="">全部协议</option>
         <option value="tcp">TCP</option>
         <option value="udp">UDP</option>
+        <option value="http">HTTP</option>
+        <option value="https">HTTPS</option>
       </select>
     </Toolbar>
 
@@ -92,8 +94,9 @@ onMounted(async () => {
               <code class="mt-1 block truncate text-slate-200">{{ row.tunnel.local_host }}:{{ row.tunnel.local_port }}</code>
             </div>
             <div class="rounded-2xl border border-cyan-300/10 bg-cyan-300/[0.04] px-4 py-3">
-              <div class="text-xs text-slate-500">远程端口</div>
-              <code class="mt-1 block text-cyan-100">{{ row.tunnel.remote_port }}</code>
+              <div class="text-xs text-slate-500">入口</div>
+              <code v-if="row.tunnel.remote_port" class="mt-1 block text-cyan-100">{{ row.tunnel.remote_port }}</code>
+              <code v-else class="mt-1 block truncate text-cyan-100">{{ row.tunnel.custom_domain || '未配置' }}</code>
             </div>
           </div>
 

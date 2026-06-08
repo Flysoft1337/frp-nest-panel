@@ -20,7 +20,7 @@ use crate::{
     routes::types::{
         AdminSummaryResponse, AdminTrafficSummaryResponse, AdminTunnelResponse,
         AdminTunnelTrafficResponse, ConfigResponse, FrpsStatusResponse, InviteResponse, OkResponse,
-        PageResponse, PublicUser, TunnelResponse, UserRowResponse,
+        PageResponse, PanelTlsResponse, PublicUser, TunnelResponse, UserRowResponse,
     },
     services::{frps, invite, password, validation},
     state::AppState,
@@ -51,6 +51,14 @@ pub struct ListQuery {
 }
 
 #[derive(Deserialize)]
+pub struct PanelTlsForm {
+    enabled: bool,
+    bind: String,
+    certificate_pem: Option<String>,
+    private_key_pem: Option<String>,
+}
+
+#[derive(Deserialize)]
 pub struct FrpsUpdateForm {
     server_addr: String,
     bind_port: u16,
@@ -61,6 +69,8 @@ pub struct FrpsUpdateForm {
     dashboard_port: Option<u16>,
     dashboard_user: String,
     dashboard_password: String,
+    vhost_http_port: Option<u16>,
+    vhost_https_port: Option<u16>,
 }
 
 pub async fn config(
@@ -324,6 +334,8 @@ pub async fn all_tunnels(
         .filter(|item| match query.status.as_deref() {
             Some("tcp") => item.protocol == "tcp",
             Some("udp") => item.protocol == "udp",
+            Some("http") => item.protocol == "http",
+            Some("https") => item.protocol == "https",
             Some(_) => false,
             None => true,
         })
@@ -336,7 +348,15 @@ pub async fn all_tunnels(
                         .unwrap_or("");
                     item.name.to_ascii_lowercase().contains(q)
                         || item.local_host.to_ascii_lowercase().contains(q)
-                        || item.remote_port.to_string().contains(q)
+                        || item
+                            .remote_port
+                            .map(|port| port.to_string().contains(q))
+                            .unwrap_or(false)
+                        || item
+                            .custom_domain
+                            .as_deref()
+                            .map(|domain| domain.contains(q))
+                            .unwrap_or(false)
                         || username.to_ascii_lowercase().contains(q)
                 })
                 .unwrap_or(true)
@@ -410,6 +430,41 @@ pub async fn traffic_summary(
     }))
 }
 
+pub async fn panel_tls_status(AdminUser(_user): AdminUser) -> AppResult<impl IntoResponse> {
+    let config = crate::services::panel_tls::load_config()
+        .await
+        .unwrap_or_default();
+    Ok(Json(PanelTlsResponse {
+        enabled: config.enabled,
+        bind: config.bind,
+        domains: config.domains,
+        not_after: config.not_after,
+        fingerprint_sha256: config.fingerprint_sha256,
+    }))
+}
+
+pub async fn update_panel_tls(
+    AdminUser(_user): AdminUser,
+    Json(form): Json<PanelTlsForm>,
+) -> AppResult<impl IntoResponse> {
+    let config = crate::services::panel_tls::save_config(
+        form.enabled,
+        form.bind,
+        form.certificate_pem
+            .filter(|value| !value.trim().is_empty()),
+        form.private_key_pem
+            .filter(|value| !value.trim().is_empty()),
+    )
+    .await?;
+    Ok(Json(PanelTlsResponse {
+        enabled: config.enabled,
+        bind: config.bind,
+        domains: config.domains,
+        not_after: config.not_after,
+        fingerprint_sha256: config.fingerprint_sha256,
+    }))
+}
+
 pub async fn frps_status(
     State(state): State<AppState>,
     AdminUser(_user): AdminUser,
@@ -436,6 +491,8 @@ pub async fn frps_status(
         dashboard_user: frps.dashboard_user,
         dashboard_configured: frps.dashboard_port.is_some(),
         dashboard_available,
+        vhost_http_port: frps.vhost_http_port,
+        vhost_https_port: frps.vhost_https_port,
     }))
 }
 
@@ -466,12 +523,18 @@ pub async fn update_frps(
     if form.dashboard_port.is_some() && form.dashboard_addr.trim().is_empty() {
         return Err(AppError::BadRequest("dashboard 地址不能为空".to_owned()));
     }
+    if form.vhost_http_port == Some(form.bind_port) || form.vhost_https_port == Some(form.bind_port)
+    {
+        return Err(AppError::BadRequest(
+            "域名入口端口不能和 bindPort 相同".to_owned(),
+        ));
+    }
 
     let allocated_ports = tunnels::Entity::find()
         .all(&state.db)
         .await?
         .into_iter()
-        .map(|item| item.remote_port)
+        .filter_map(|item| item.remote_port)
         .collect::<Vec<_>>();
     if allocated_ports
         .iter()
@@ -496,6 +559,8 @@ pub async fn update_frps(
     if !form.dashboard_password.is_empty() {
         current.dashboard_password = form.dashboard_password;
     }
+    current.vhost_http_port = form.vhost_http_port;
+    current.vhost_https_port = form.vhost_https_port;
 
     frps::write_runtime_config(&current)
         .await

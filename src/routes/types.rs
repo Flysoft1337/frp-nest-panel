@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::{
     config::Config,
-    entities::{invite_codes, tunnels, users},
+    entities::{certificates, invite_codes, tunnels, users},
 };
 
 #[derive(Serialize)]
@@ -48,7 +48,10 @@ pub struct TunnelResponse {
     pub protocol: String,
     pub local_host: String,
     pub local_port: i32,
-    pub remote_port: i32,
+    pub remote_port: Option<i32>,
+    pub custom_domain: Option<String>,
+    pub tls_mode: Option<String>,
+    pub certificate_id: Option<Uuid>,
     pub created_at: DateTime<FixedOffset>,
 }
 
@@ -70,6 +73,9 @@ impl From<tunnels::Model> for TunnelResponse {
             local_host: tunnel.local_host,
             local_port: tunnel.local_port,
             remote_port: tunnel.remote_port,
+            custom_domain: tunnel.custom_domain,
+            tls_mode: tunnel.tls_mode,
+            certificate_id: tunnel.certificate_id,
             created_at: tunnel.created_at,
         }
     }
@@ -79,6 +85,31 @@ impl From<tunnels::Model> for TunnelResponse {
 pub struct FrpcResponse {
     pub tunnel: TunnelResponse,
     pub frpc_toml: String,
+}
+
+#[derive(Serialize)]
+pub struct CertificateResponse {
+    pub id: Uuid,
+    pub name: String,
+    pub domains: Vec<String>,
+    pub not_before: DateTime<FixedOffset>,
+    pub not_after: DateTime<FixedOffset>,
+    pub fingerprint_sha256: String,
+    pub created_at: DateTime<FixedOffset>,
+}
+
+impl From<certificates::Model> for CertificateResponse {
+    fn from(cert: certificates::Model) -> Self {
+        Self {
+            id: cert.id,
+            name: cert.name,
+            domains: crate::services::certificates::domains_from_json(&cert.domains_json),
+            not_before: cert.not_before,
+            not_after: cert.not_after,
+            fingerprint_sha256: cert.fingerprint_sha256,
+            created_at: cert.created_at,
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -173,6 +204,17 @@ pub struct FrpsStatusResponse {
     pub dashboard_user: String,
     pub dashboard_configured: bool,
     pub dashboard_available: bool,
+    pub vhost_http_port: Option<u16>,
+    pub vhost_https_port: Option<u16>,
+}
+
+#[derive(Serialize)]
+pub struct PanelTlsResponse {
+    pub enabled: bool,
+    pub bind: String,
+    pub domains: Vec<String>,
+    pub not_after: Option<DateTime<FixedOffset>>,
+    pub fingerprint_sha256: String,
 }
 
 #[derive(Serialize)]

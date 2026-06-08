@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 
-import { getFrps, restartFrps, updateFrps } from '../api/admin'
-import type { FrpsStatus } from '../api/types'
+import { getFrps, getPanelTls, restartFrps, updateFrps, updatePanelTls } from '../api/admin'
+import type { FrpsStatus, PanelTlsStatus } from '../api/types'
 import AdminNav from '../components/AdminNav.vue'
 import AlertBox from '../components/AlertBox.vue'
 import ConfirmButton from '../components/ConfirmButton.vue'
@@ -12,6 +12,7 @@ import StatCard from '../components/StatCard.vue'
 import StatusPill from '../components/StatusPill.vue'
 
 const status = ref<FrpsStatus | null>(null)
+const panelTls = ref<PanelTlsStatus | null>(null)
 const form = reactive({
   server_addr: '',
   bind_port: 7000,
@@ -22,6 +23,14 @@ const form = reactive({
   dashboard_port: null as number | null,
   dashboard_user: '',
   dashboard_password: '',
+  vhost_http_port: null as number | null,
+  vhost_https_port: null as number | null,
+})
+const panelTlsForm = reactive({
+  enabled: false,
+  bind: '0.0.0.0:8443',
+  certificate_pem: '',
+  private_key_pem: '',
 })
 const error = ref('')
 const message = ref('')
@@ -38,6 +47,14 @@ async function load() {
   form.dashboard_port = data.dashboard_port
   form.dashboard_user = data.dashboard_user
   form.dashboard_password = ''
+  form.vhost_http_port = data.vhost_http_port
+  form.vhost_https_port = data.vhost_https_port
+  const tls = await getPanelTls()
+  panelTls.value = tls
+  panelTlsForm.enabled = tls.enabled
+  panelTlsForm.bind = tls.bind
+  panelTlsForm.certificate_pem = ''
+  panelTlsForm.private_key_pem = ''
 }
 
 async function save() {
@@ -47,6 +64,19 @@ async function save() {
     await updateFrps({ ...form })
     await load()
     message.value = '配置已保存，需重启 frps 生效'
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '保存失败'
+  }
+}
+
+async function savePanelTls() {
+  error.value = ''
+  message.value = ''
+  try {
+    panelTls.value = await updatePanelTls({ ...panelTlsForm })
+    panelTlsForm.certificate_pem = ''
+    panelTlsForm.private_key_pem = ''
+    message.value = '面板 HTTPS 配置已保存，需重启面板生效'
   } catch (err) {
     error.value = err instanceof Error ? err.message : '保存失败'
   }
@@ -137,6 +167,17 @@ onMounted(async () => {
 
       <section class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
         <div class="mb-4 flex flex-col gap-1">
+          <h2 class="text-lg font-bold text-white">域名入口</h2>
+          <p class="text-sm text-slate-400">启用 HTTP/HTTPS 域名隧道时，frps 会监听这些 vhost 端口。</p>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2">
+          <FormField label="HTTP vhost 端口"><input v-model="form.vhost_http_port" max="65535" min="1" placeholder="留空关闭" type="number" /></FormField>
+          <FormField label="HTTPS vhost 端口"><input v-model="form.vhost_https_port" max="65535" min="1" placeholder="留空关闭" type="number" /></FormField>
+        </div>
+      </section>
+
+      <section class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+        <div class="mb-4 flex flex-col gap-1">
           <h2 class="text-lg font-bold text-white">Dashboard 流量数据源</h2>
           <p class="text-sm text-slate-400">启用后 frps 会写入 webServer 配置，重启 frps 后流量统计才会可用。</p>
         </div>
@@ -152,6 +193,28 @@ onMounted(async () => {
         <button class="btn-primary" type="submit">保存配置</button>
         <ConfirmButton class-name="btn-danger" :busy="status?.restarting" :message="status?.restarting ? 'frps 正在重启' : '重启 frps 会影响所有隧道连接，确定继续吗？'" @confirm="restart">{{ status?.restarting ? '重启中' : '重启 frps' }}</ConfirmButton>
       </div>
+    </form>
+  </section>
+
+  <section class="card mt-6 p-6">
+    <form class="grid gap-5" @submit.prevent="savePanelTls">
+      <div>
+        <h2 class="text-lg font-bold text-white">面板 HTTPS</h2>
+        <p class="mt-1 text-sm text-slate-400">上传管理面板自己的证书。保存后需要重启面板服务才会启用新的 HTTPS 监听。</p>
+      </div>
+      <div v-if="panelTls" class="rounded-3xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
+        <div>当前状态：{{ panelTls.enabled ? '启用' : '关闭' }}</div>
+        <div>监听地址：<code class="text-cyan-100">{{ panelTls.bind }}</code></div>
+        <div v-if="panelTls.domains.length">证书域名：<span class="text-cyan-100">{{ panelTls.domains.join(', ') }}</span></div>
+        <div v-if="panelTls.not_after">过期时间：{{ panelTls.not_after }}</div>
+      </div>
+      <div class="grid gap-4 md:grid-cols-2">
+        <FormField label="启用 HTTPS"><select v-model="panelTlsForm.enabled"><option :value="false">关闭</option><option :value="true">启用</option></select></FormField>
+        <FormField label="HTTPS 监听地址"><input v-model="panelTlsForm.bind" required placeholder="0.0.0.0:8443" /></FormField>
+        <FormField label="证书 PEM"><textarea v-model="panelTlsForm.certificate_pem" rows="6" placeholder="留空表示不修改" /></FormField>
+        <FormField label="私钥 PEM"><textarea v-model="panelTlsForm.private_key_pem" rows="6" placeholder="留空表示不修改" /></FormField>
+      </div>
+      <button class="btn-primary w-fit" type="submit">保存面板 HTTPS</button>
     </form>
   </section>
 </template>

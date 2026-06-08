@@ -1,5 +1,6 @@
 pub mod admin;
 pub mod auth;
+pub mod certificates;
 pub mod dashboard;
 pub mod health;
 pub mod tunnels;
@@ -20,6 +21,11 @@ pub fn router() -> Router<AppState> {
         .route("/api/register", post(auth::register))
         .route("/api/logout", post(auth::logout))
         .route("/api/password", post(auth::change_password))
+        .route(
+            "/api/certificates",
+            get(certificates::list).post(certificates::create),
+        )
+        .route("/api/certificates/{id}", delete(certificates::delete))
         .route("/api/dashboard/summary", get(dashboard::summary))
         .route(
             "/api/tunnels",
@@ -33,6 +39,7 @@ pub fn router() -> Router<AppState> {
         )
         .route("/api/tunnels/{id}/frpc", get(tunnels::preview_frpc))
         .route("/tunnels/{id}/frpc.toml", get(tunnels::download_frpc))
+        .route("/tunnels/{id}/frpc.zip", get(tunnels::download_frpc_bundle))
         .route("/api/admin/config", get(admin::config))
         .route("/api/admin/summary", get(admin::summary))
         .route(
@@ -40,6 +47,10 @@ pub fn router() -> Router<AppState> {
             get(admin::frps_status).put(admin::update_frps),
         )
         .route("/api/admin/frps/restart", post(admin::restart_frps))
+        .route(
+            "/api/admin/panel-tls",
+            get(admin::panel_tls_status).put(admin::update_panel_tls),
+        )
         .route(
             "/api/admin/invites",
             get(admin::invites).post(admin::create_invite),
