@@ -45,6 +45,12 @@ const certificateOptions = computed(() => [
     value: cert.id,
   })),
 ])
+const protocolLabel = computed(() => protocolOptions.find((option) => option.value === protocol.value)?.label ?? protocol.value.toUpperCase())
+const entryLabel = computed(() => {
+  if (isPortTunnel.value) return isEdit.value ? '远程端口保持不变' : '远程端口可手动填写，也可以留空自动分配'
+  if (protocol.value === 'http') return '通过 HTTP vhost 域名访问本地服务'
+  return tlsMode.value === 'uploaded_cert' ? 'frpc 使用上传证书提供 HTTPS 入口' : 'TLS 透传到本地服务'
+})
 
 async function loadTunnel() {
   if (!tunnelId.value) return
@@ -111,19 +117,52 @@ onMounted(async () => {
     :title="isEdit ? '编辑隧道' : '创建隧道'"
     :description="isEdit ? '修改隧道名称、协议和本地服务地址。远程端口保持不变。' : '选择 TCP 或 UDP，并填写本地服务地址。远程端口可选。'"
   />
-  <section class="card max-w-2xl p-6">
+  <section class="card max-w-3xl p-6">
     <p v-if="loadingTunnel" class="mb-4 text-sm text-slate-400">加载中</p>
     <form class="grid gap-5" @submit.prevent="submit">
-      <FormField label="隧道名称"><input v-model="name" placeholder="mc-server" required /></FormField>
-      <FormField label="协议"><SelectField v-model="protocol" :options="protocolOptions" /></FormField>
-      <div class="grid gap-5 md:grid-cols-2">
-        <FormField label="本地地址"><input v-model="localHost" required /></FormField>
-        <FormField label="本地端口"><input v-model="localPort" max="65535" min="1" required type="number" /></FormField>
+      <div class="rounded-3xl border border-cyan-300/20 bg-cyan-300/[0.06] p-4">
+        <div class="text-xs font-bold uppercase tracking-[0.2em] text-cyan-100/80">{{ protocolLabel }}</div>
+        <div class="mt-2 text-sm text-slate-300">{{ entryLabel }}</div>
       </div>
-      <FormField v-if="!isEdit && isPortTunnel" label="远程端口（可选)"><input v-model="remotePort" max="65535" min="1" placeholder="留空自动分配" type="number" /></FormField>
-      <FormField v-if="isDomainTunnel" label="绑定域名"><input v-model="customDomain" required placeholder="example.com" /></FormField>
-      <FormField v-if="protocol === 'https'" label="TLS 模式"><SelectField v-model="tlsMode" :options="tlsModeOptions" /></FormField>
-      <FormField v-if="protocol === 'https' && tlsMode === 'uploaded_cert'" label="证书"><SelectField v-model="certificateId" :options="certificateOptions" /></FormField>
+
+      <section class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+        <div class="mb-4 flex flex-col gap-1">
+          <h2 class="text-lg font-bold text-white">基础信息</h2>
+          <p class="text-sm text-slate-400">名称只用于面板和 frpc 配置识别。</p>
+        </div>
+        <div class="grid gap-5 md:grid-cols-2">
+          <FormField label="隧道名称"><input v-model="name" placeholder="mc-server" required /></FormField>
+          <FormField label="协议"><SelectField v-model="protocol" :options="protocolOptions" /></FormField>
+        </div>
+      </section>
+
+      <section class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+        <div class="mb-4 flex flex-col gap-1">
+          <h2 class="text-lg font-bold text-white">本地服务</h2>
+          <p class="text-sm text-slate-400">frpc 会把远端入口转发到这里。</p>
+        </div>
+        <div class="grid gap-5 md:grid-cols-2">
+          <FormField label="本地地址"><input v-model="localHost" required /></FormField>
+          <FormField label="本地端口"><input v-model="localPort" max="65535" min="1" required type="number" /></FormField>
+        </div>
+      </section>
+
+      <section class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+        <div class="mb-4 flex flex-col gap-1">
+          <h2 class="text-lg font-bold text-white">远端入口</h2>
+          <p class="text-sm text-slate-400">端口隧道使用远程端口，域名隧道使用绑定域名。</p>
+        </div>
+        <div class="grid gap-5">
+          <FormField v-if="!isEdit && isPortTunnel" label="远程端口（可选)"><input v-model="remotePort" max="65535" min="1" placeholder="留空自动分配" type="number" /></FormField>
+          <FormField v-if="isDomainTunnel" label="绑定域名"><input v-model="customDomain" required placeholder="example.com" /></FormField>
+          <FormField v-if="protocol === 'https'" label="TLS 模式"><SelectField v-model="tlsMode" :options="tlsModeOptions" /></FormField>
+          <FormField v-if="protocol === 'https' && tlsMode === 'uploaded_cert'" label="证书"><SelectField v-model="certificateId" :options="certificateOptions" /></FormField>
+        </div>
+      </section>
+
+      <div v-if="protocol === 'https' && tlsMode === 'uploaded_cert' && certificates.length === 0" class="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
+        还没有可用证书。先到证书页上传证书和私钥，再回来选择。
+      </div>
       <div v-if="isDomainTunnel" class="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
         域名需要解析到 frps 服务器。HTTPS 上传证书模式会生成包含证书和私钥的 frpc.zip。
       </div>
@@ -131,7 +170,7 @@ onMounted(async () => {
         远程端口保持不变：<code class="text-cyan-100">{{ remotePort }}</code>
       </div>
       <p v-if="error" class="rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{{ error }}</p>
-      <div class="flex flex-wrap gap-3">
+      <div class="sticky bottom-4 z-20 flex flex-wrap gap-3 rounded-3xl border border-white/10 bg-slate-950/80 p-3 shadow-2xl shadow-slate-950/60 backdrop-blur-xl">
         <button class="btn-primary" :disabled="loading || loadingTunnel" type="submit">{{ loading ? '保存中' : isEdit ? '保存修改' : '创建' }}</button>
         <RouterLink class="btn-secondary" role="button" to="/dashboard">返回</RouterLink>
       </div>
