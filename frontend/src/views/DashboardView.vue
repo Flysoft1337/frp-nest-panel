@@ -83,35 +83,43 @@ onMounted(load)
       <RouterLink class="btn-primary mt-6" role="button" to="/tunnels/new">创建第一个隧道</RouterLink>
     </div>
 
-    <div v-else class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>名称</th><th>协议</th><th>本地</th><th>入口</th><th>流量</th><th>操作</th></tr></thead>
-        <tbody>
-          <tr v-for="row in tunnels" :key="row.tunnel.id">
-            <td class="font-semibold text-white">{{ row.tunnel.name }}</td>
-            <td><StatusPill>{{ row.tunnel.protocol }}</StatusPill></td>
-            <td><code class="text-slate-300">{{ row.tunnel.local_host }}:{{ row.tunnel.local_port }}</code></td>
-            <td>
-              <code v-if="row.tunnel.remote_port" class="text-cyan-100">{{ row.tunnel.remote_port }}</code>
-              <a v-else-if="row.tunnel.custom_domain" class="break-all text-cyan-100" :href="`${row.tunnel.protocol}://${row.tunnel.custom_domain}`" target="_blank">{{ row.tunnel.protocol }}://{{ row.tunnel.custom_domain }}</a>
-              <span v-else class="text-sm text-slate-500">未配置</span>
-            </td>
-            <td>
-              <code v-if="row.traffic_available" class="text-cyan-100">↓ {{ formatBytes(row.traffic_in) }} / ↑ {{ formatBytes(row.traffic_out) }}</code>
-              <span v-else class="text-sm text-slate-500">暂无数据</span>
-            </td>
-            <td>
+    <div v-else class="grid gap-3">
+      <article v-for="row in tunnels" :key="row.tunnel.id" class="rounded-3xl border border-white/10 bg-white/[0.04] p-4 transition hover:border-cyan-300/20 hover:bg-white/[0.06]">
+        <div class="grid gap-4">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2">
-                <RouterLink class="btn-secondary" role="button" :to="`/tunnels/${row.tunnel.id}/edit`">编辑</RouterLink>
-                <RouterLink class="btn-secondary" role="button" :to="`/tunnels/${row.tunnel.id}/frpc`">预览</RouterLink>
-                <a class="btn-secondary" role="button" :href="`/tunnels/${row.tunnel.id}/frpc.toml`">下载</a>
-                <a v-if="row.tunnel.tls_mode === 'uploaded_cert'" class="btn-secondary" role="button" :href="`/tunnels/${row.tunnel.id}/frpc.zip`">配置包</a>
-                <ConfirmButton message="确定删除这个隧道吗？" @confirm="remove(row.tunnel.id)">删除</ConfirmButton>
+                <h2 class="truncate text-lg font-black text-white">{{ row.tunnel.name }}</h2>
+                <StatusPill>{{ row.tunnel.protocol }}</StatusPill>
               </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+              <div class="mt-2 text-sm text-slate-400">
+                <code v-if="row.traffic_available" class="text-cyan-100">↓ {{ formatBytes(row.traffic_in) }} / ↑ {{ formatBytes(row.traffic_out) }}</code>
+                <span v-else>流量暂无数据</span>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <RouterLink class="btn-secondary" role="button" :to="`/tunnels/${row.tunnel.id}/edit`">编辑</RouterLink>
+              <RouterLink class="btn-secondary" role="button" :to="`/tunnels/${row.tunnel.id}/frpc`">预览</RouterLink>
+              <a class="btn-secondary" role="button" :href="`/tunnels/${row.tunnel.id}/frpc.toml`">下载</a>
+              <a v-if="row.tunnel.tls_mode === 'uploaded_cert'" class="btn-secondary" role="button" :href="`/tunnels/${row.tunnel.id}/frpc.zip`">配置包</a>
+              <ConfirmButton message="确定删除这个隧道吗？" @confirm="remove(row.tunnel.id)">删除</ConfirmButton>
+            </div>
+          </div>
+
+          <div class="grid gap-3 border-t border-white/10 pt-4 md:grid-cols-2">
+            <div class="rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3">
+              <div class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Local</div>
+              <code class="mt-2 block truncate text-slate-200">{{ row.tunnel.local_host }}:{{ row.tunnel.local_port }}</code>
+            </div>
+            <div class="rounded-2xl border border-cyan-300/10 bg-cyan-300/[0.04] px-4 py-3">
+              <div class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Entry</div>
+              <code v-if="row.tunnel.remote_port" class="mt-2 block text-cyan-100">:{{ row.tunnel.remote_port }}</code>
+              <a v-else-if="row.tunnel.custom_domain" class="mt-2 block break-all text-cyan-100" :href="`${row.tunnel.protocol}://${row.tunnel.custom_domain}`" target="_blank">{{ row.tunnel.protocol }}://{{ row.tunnel.custom_domain }}</a>
+              <span v-else class="mt-2 block text-sm text-slate-500">未配置</span>
+            </div>
+          </div>
+        </div>
+      </article>
     </div>
   </section>
 </template>
