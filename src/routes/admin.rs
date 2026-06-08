@@ -19,11 +19,11 @@ use crate::{
     error::{AppError, AppResult},
     routes::types::{
         AdminSummaryResponse, AdminTrafficSummaryResponse, AdminTunnelResponse,
-        AdminTunnelTrafficResponse, CaddyResponse, ConfigResponse, FrpsStatusResponse,
-        InviteResponse, OkResponse, PageResponse, PanelTlsResponse, PublicUser, TunnelResponse,
-        UserRowResponse,
+        AdminTunnelTrafficResponse, CaddyResponse, ConfigResponse, FrpcResponse,
+        FrpsStatusResponse, InviteResponse, OkResponse, PageResponse, PanelTlsResponse, PublicUser,
+        TunnelResponse, UserRowResponse,
     },
-    services::{caddy, frps, invite, password, validation},
+    services::{caddy, frpc, frps, invite, password, validation},
     state::AppState,
 };
 
@@ -382,6 +382,29 @@ pub async fn all_tunnels(
         })
         .collect::<Vec<_>>();
     Ok(Json(page_response(items, &query)))
+}
+
+pub async fn preview_tunnel_frpc(
+    State(state): State<AppState>,
+    AdminUser(_admin): AdminUser,
+    Path(id): Path<Uuid>,
+) -> AppResult<impl IntoResponse> {
+    let Some(tunnel) = tunnels::Entity::find_by_id(id).one(&state.db).await? else {
+        return Err(AppError::NotFound);
+    };
+    let Some(user) = users::Entity::find_by_id(tunnel.user_id)
+        .one(&state.db)
+        .await?
+    else {
+        return Err(AppError::NotFound);
+    };
+
+    let frps = state.frps.read().await;
+    let frpc_toml = frpc::render_frpc_toml(&frps, &user, &tunnel);
+    Ok(Json(FrpcResponse {
+        tunnel: TunnelResponse::from(tunnel),
+        frpc_toml,
+    }))
 }
 
 pub async fn traffic_summary(

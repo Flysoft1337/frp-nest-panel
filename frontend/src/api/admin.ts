@@ -5,6 +5,7 @@ import type {
   AdminTunnelRow,
   CaddyStatus,
   ConfigResponse,
+  FrpcResponse,
   FrpsStatus,
   FrpsUpdate,
   PanelTlsStatus,
@@ -83,6 +84,10 @@ export function listAllTunnels(params?: ListParams) {
 
 export function deleteTunnel(id: string) {
   return api<{ ok: boolean }>(`/api/admin/tunnels/${id}`, { method: 'DELETE' })
+}
+
+export function getAdminTunnelFrpc(id: string) {
+  return api<FrpcResponse>(`/api/admin/tunnels/${id}/frpc`)
 }
 
 export function getFrps() {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 
-import { deleteTunnel, listAllTunnels } from '../api/admin'
+import { deleteTunnel, getAdminTunnelFrpc, listAllTunnels } from '../api/admin'
 import type { AdminTunnelRow, PageResponse } from '../api/types'
 import AdminNav from '../components/AdminNav.vue'
 import AlertBox from '../components/AlertBox.vue'
@@ -18,6 +18,8 @@ const status = ref('')
 const currentPage = ref(1)
 const error = ref('')
 const message = ref('')
+const frpcPreview = ref('')
+const frpcPreviewTitle = ref('')
 const protocolOptions = [
   { label: '全部协议', value: '' },
   { label: 'TCP', value: 'tcp' },
@@ -46,6 +48,30 @@ async function remove(id: string) {
   } catch (err) {
     error.value = err instanceof Error ? err.message : '删除失败'
   }
+}
+
+async function previewFrpc(row: AdminTunnelRow) {
+  error.value = ''
+  message.value = ''
+  try {
+    const result = await getAdminTunnelFrpc(row.tunnel.id)
+    frpcPreviewTitle.value = `${row.username} / ${row.tunnel.name}`
+    frpcPreview.value = result.frpc_toml
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '加载 frpc 配置失败'
+  }
+}
+
+async function downloadFrpc(row: AdminTunnelRow) {
+  await previewFrpc(row)
+  if (!frpcPreview.value) return
+  const blob = new Blob([frpcPreview.value], { type: 'application/toml;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${row.tunnel.name}-frpc.toml`
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 watch([q, status], () => {
@@ -98,7 +124,11 @@ onMounted(async () => {
                 <span>创建 {{ row.tunnel.created_at }}</span>
               </div>
             </div>
-            <ConfirmButton message="确定删除这个隧道吗？" @confirm="remove(row.tunnel.id)">删除</ConfirmButton>
+            <div class="flex flex-wrap gap-2">
+              <button class="btn-secondary" type="button" @click="previewFrpc(row)">预览 frpc</button>
+              <button class="btn-secondary" type="button" @click="downloadFrpc(row)">下载 frpc</button>
+              <ConfirmButton message="确定删除这个隧道吗？" @confirm="remove(row.tunnel.id)">删除</ConfirmButton>
+            </div>
           </div>
 
           <div class="grid gap-3 border-t border-white/10 pt-4 md:grid-cols-2">
@@ -114,6 +144,17 @@ onMounted(async () => {
           </div>
         </div>
       </article>
+    </div>
+
+    <div v-if="frpcPreview" class="mt-5 rounded-3xl border border-cyan-300/20 bg-slate-950/60 p-4">
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div class="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200/80">frpc.toml</div>
+          <h2 class="mt-1 text-lg font-black text-white">{{ frpcPreviewTitle }}</h2>
+        </div>
+        <button class="btn-secondary" type="button" @click="frpcPreview = ''">关闭</button>
+      </div>
+      <pre class="max-h-96 overflow-auto rounded-2xl border border-white/10 bg-slate-950 p-4 text-sm text-slate-200"><code>{{ frpcPreview }}</code></pre>
     </div>
 
     <PaginationBar :total="page?.total || 0" :page="currentPage" :total-pages="totalPages" @prev="currentPage--; load()" @next="currentPage++; load()" />
