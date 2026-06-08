@@ -30,6 +30,7 @@ const totalPages = computed(() => {
   if (!page.value) return 1
   return Math.max(1, Math.ceil(page.value.total / page.value.page_size))
 })
+const tunnelCountLabel = computed(() => `${page.value?.total || 0} 条隧道`)
 
 async function load() {
   page.value = await listAllTunnels({ q: q.value, status: status.value, page: currentPage.value })
@@ -71,39 +72,45 @@ onMounted(async () => {
       <AlertBox v-if="message" tone="success" :message="message" />
     </div>
 
-    <Toolbar>
-      <input v-model="q" placeholder="搜索名称、本地地址、远程端口、域名或用户名" />
-      <SelectField v-model="status" :options="protocolOptions" />
-    </Toolbar>
+    <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <Toolbar>
+        <input v-model="q" placeholder="搜索名称、本地地址、远程端口、域名或用户名" />
+        <SelectField v-model="status" :options="protocolOptions" />
+      </Toolbar>
+      <span class="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold text-cyan-100">{{ tunnelCountLabel }}</span>
+    </div>
 
-    <div class="grid gap-3">
-      <article v-for="row in page?.items || []" :key="row.tunnel.id" class="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div class="min-w-0">
-            <div class="flex flex-wrap items-center gap-2">
-              <h2 class="truncate text-lg font-black text-white">{{ row.tunnel.name }}</h2>
-              <StatusPill>{{ row.tunnel.protocol }}</StatusPill>
+    <div v-if="(page?.items || []).length === 0" class="empty-state">
+      <div class="text-base font-bold text-white">没有匹配的隧道</div>
+      <p class="mt-2 text-sm text-slate-400">调整筛选条件，或让用户先创建隧道。</p>
+    </div>
+    <div v-else class="grid gap-3">
+      <article v-for="row in page?.items || []" :key="row.tunnel.id" class="rounded-3xl border border-white/10 bg-white/[0.04] p-4 transition hover:border-cyan-300/20 hover:bg-white/[0.06]">
+        <div class="grid gap-4">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <h2 class="truncate text-lg font-black text-white">{{ row.tunnel.name }}</h2>
+                <StatusPill>{{ row.tunnel.protocol }}</StatusPill>
+              </div>
+              <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-400">
+                <span>用户 <strong class="text-slate-200">{{ row.username }}</strong></span>
+                <span>创建 {{ row.tunnel.created_at }}</span>
+              </div>
             </div>
-            <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-400">
-              <span>用户 <strong class="text-slate-200">{{ row.username }}</strong></span>
-              <span>创建 {{ row.tunnel.created_at }}</span>
-            </div>
+            <ConfirmButton message="确定删除这个隧道吗？" @confirm="remove(row.tunnel.id)">删除</ConfirmButton>
           </div>
 
-          <div class="grid gap-3 md:grid-cols-2 xl:min-w-[28rem]">
-            <div class="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
-              <div class="text-xs text-slate-500">本地服务</div>
-              <code class="mt-1 block truncate text-slate-200">{{ row.tunnel.local_host }}:{{ row.tunnel.local_port }}</code>
+          <div class="grid gap-3 border-t border-white/10 pt-4 md:grid-cols-2">
+            <div class="rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3">
+              <div class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Local</div>
+              <code class="mt-2 block truncate text-slate-200">{{ row.tunnel.local_host }}:{{ row.tunnel.local_port }}</code>
             </div>
             <div class="rounded-2xl border border-cyan-300/10 bg-cyan-300/[0.04] px-4 py-3">
-              <div class="text-xs text-slate-500">入口</div>
-              <code v-if="row.tunnel.remote_port" class="mt-1 block text-cyan-100">{{ row.tunnel.remote_port }}</code>
-              <code v-else class="mt-1 block truncate text-cyan-100">{{ row.tunnel.custom_domain || '未配置' }}</code>
+              <div class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Entry</div>
+              <code v-if="row.tunnel.remote_port" class="mt-2 block text-cyan-100">:{{ row.tunnel.remote_port }}</code>
+              <code v-else class="mt-2 block truncate text-cyan-100">{{ row.tunnel.custom_domain || '未配置' }}</code>
             </div>
-          </div>
-
-          <div class="flex justify-start xl:justify-end">
-            <ConfirmButton message="确定删除这个隧道吗？" @confirm="remove(row.tunnel.id)">删除</ConfirmButton>
           </div>
         </div>
       </article>
