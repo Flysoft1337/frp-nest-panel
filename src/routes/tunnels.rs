@@ -248,11 +248,16 @@ async fn validate_tunnel_form(
     let protocol = validation::tunnel_protocol(&form.protocol)?;
     let local_host = validation::local_host(&form.local_host)?;
     let local_port = validation::local_port(form.local_port)?;
-    let custom_domain = form
-        .custom_domain
-        .as_deref()
-        .map(validation::domain)
-        .transpose()?;
+    let custom_domains = normalize_custom_domains(form.custom_domain.as_deref())?;
+    let custom_domain = if custom_domains.is_empty() {
+        None
+    } else {
+        let value = custom_domains.join(",");
+        if value.len() > 253 {
+            return Err(AppError::BadRequest("绑定域名总长度过长".to_owned()));
+        }
+        Some(value)
+    };
     let tls_mode = form
         .tls_mode
         .map(|value| value.trim().to_owned())
@@ -288,9 +293,9 @@ async fn validate_tunnel_form(
                     "HTTPS 隧道不能设置远程端口".to_owned(),
                 ));
             }
-            let Some(domain) = custom_domain.as_deref() else {
+            if custom_domains.is_empty() {
                 return Err(AppError::BadRequest("HTTPS 隧道必须绑定域名".to_owned()));
-            };
+            }
             if state.frps.read().await.vhost_https_port.is_none() {
                 return Err(AppError::BadRequest(
                     "管理员尚未启用 HTTPS 域名入口".to_owned(),
@@ -305,8 +310,10 @@ async fn validate_tunnel_form(
                     let cert = get_owned_certificate(state, user_id, cert_id).await?;
                     let domains =
                         crate::services::certificates::domains_from_json(&cert.domains_json);
-                    if !crate::services::certificates::certificate_covers_domain(&domains, domain) {
-                        return Err(AppError::BadRequest("证书未覆盖绑定域名".to_owned()));
+                    if custom_domains.iter().any(|domain| {
+                        !crate::services::certificates::certificate_covers_domain(&domains, domain)
+                    }) {
+                        return Err(AppError::BadRequest("证书未覆盖全部绑定域名".to_owned()));
                     }
                 }
                 _ => return Err(AppError::BadRequest("HTTPS TLS 模式不合法".to_owned())),
@@ -315,7 +322,7 @@ async fn validate_tunnel_form(
         _ => unreachable!(),
     }
 
-    if let Some(domain) = custom_domain.as_deref() {
+    for domain in &custom_domains {
         ensure_domain_available(state, &protocol, domain, tunnel_id).await?;
     }
 
@@ -329,6 +336,27 @@ async fn validate_tunnel_form(
         tls_mode,
         certificate_id,
     })
+}
+
+fn normalize_custom_domains(value: Option<&str>) -> AppResult<Vec<String>> {
+    let Some(value) = value else {
+        return Ok(Vec::new());
+    };
+    let mut domains = Vec::new();
+    for domain in value.split([',', '\n']) {
+        let domain = domain.trim();
+        if domain.is_empty() {
+            continue;
+        }
+        let domain = validation::domain(domain)?;
+        if !domains.contains(&domain) {
+            domains.push(domain);
+        }
+    }
+    if domains.len() > 8 {
+        return Err(AppError::BadRequest("最多绑定 8 个域名".to_owned()));
+    }
+    Ok(domains)
 }
 
 async fn update_remote_port(
@@ -388,15 +416,20 @@ async fn ensure_domain_available(
     domain: &str,
     tunnel_id: Option<Uuid>,
 ) -> AppResult<()> {
-    let existing = tunnels::Entity::find()
+    let exists = tunnels::Entity::find()
         .filter(tunnels::Column::Protocol.eq(protocol))
-        .filter(tunnels::Column::CustomDomain.eq(domain))
-        .one(&state.db)
-        .await?;
-    if existing
-        .map(|tunnel| Some(tunnel.id) != tunnel_id)
-        .unwrap_or(false)
-    {
+        .all(&state.db)
+        .await?
+        .into_iter()
+        .any(|tunnel| {
+            Some(tunnel.id) != tunnel_id
+                && tunnel
+                    .custom_domain
+                    .as_deref()
+                    .map(|domains| domains.split(',').any(|item| item.trim() == domain))
+                    .unwrap_or(false)
+        });
+    if exists {
         return Err(AppError::BadRequest("域名已被占用".to_owned()));
     }
     Ok(())

@@ -92,6 +92,14 @@ pub fn render_frpc_toml(
     .unwrap_or_default()
 }
 
+fn custom_domains(value: &str) -> Vec<&str> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|domain| !domain.is_empty())
+        .collect()
+}
+
 fn domain_proxy<'a>(
     tunnel: &'a tunnels::Model,
     plugin: Option<FrpcTomlPlugin>,
@@ -103,7 +111,7 @@ fn domain_proxy<'a>(
         local_ip: (!uploaded_cert).then_some(tunnel.local_host.as_str()),
         local_port: (!uploaded_cert).then_some(tunnel.local_port),
         remote_port: None,
-        custom_domains: tunnel.custom_domain.as_deref().map(|domain| vec![domain]),
+        custom_domains: tunnel.custom_domain.as_deref().map(custom_domains),
         plugin,
     }
 }

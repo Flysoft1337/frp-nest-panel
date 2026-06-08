@@ -168,7 +168,7 @@ onMounted(async () => {
         </div>
         <div class="grid gap-5">
           <FormField v-if="isPortTunnel" label="远程端口（可选)"><input v-model="remotePort" max="65535" min="1" placeholder="留空自动分配" type="number" /></FormField>
-          <FormField v-if="isDomainTunnel" label="绑定域名"><input v-model="customDomain" required placeholder="example.com" /></FormField>
+          <FormField v-if="isDomainTunnel" label="绑定域名"><textarea v-model="customDomain" required rows="3" placeholder="example.com&#10;api.example.com" /></FormField>
           <FormField v-if="protocol === 'https'" label="TLS 模式"><SelectField v-model="tlsMode" :options="tlsModeOptions" /></FormField>
           <FormField v-if="protocol === 'https' && tlsMode === 'uploaded_cert'" label="证书"><SelectField v-model="certificateId" :options="certificateOptions" /></FormField>
         </div>
@@ -179,7 +179,7 @@ onMounted(async () => {
       </div>
       <div v-if="isDomainTunnel" :class="vhostEnabled ? 'rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100' : 'rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100'">
         <div class="font-semibold">{{ vhostStatusLabel }}</div>
-        <div class="mt-1">域名需要解析到 frps 服务器。HTTPS 上传证书模式会生成包含证书和私钥的 frpc.zip。</div>
+        <div class="mt-1">每行一个域名，最多 8 个。域名需要解析到 frps 服务器。HTTPS 上传证书模式会生成包含证书和私钥的 frpc.zip。</div>
       </div>
       <p v-if="error" class="rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{{ error }}</p>
       <div class="sticky bottom-4 z-20 flex flex-wrap gap-3 rounded-3xl border border-white/10 bg-slate-950/80 p-3 shadow-2xl shadow-slate-950/60 backdrop-blur-xl">

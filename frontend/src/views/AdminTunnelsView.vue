@@ -34,6 +34,10 @@ const totalPages = computed(() => {
 })
 const tunnelCountLabel = computed(() => `${page.value?.total || 0} 条隧道`)
 
+function customDomains(value: string | null) {
+  return value?.split(',').map((domain) => domain.trim()).filter(Boolean) || []
+}
+
 async function load() {
   page.value = await listAllTunnels({ q: q.value, status: status.value, page: currentPage.value })
 }
@@ -139,7 +143,10 @@ onMounted(async () => {
             <div class="rounded-2xl border border-cyan-300/10 bg-cyan-300/[0.04] px-4 py-3">
               <div class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Entry</div>
               <code v-if="row.tunnel.remote_port" class="mt-2 block text-cyan-100">:{{ row.tunnel.remote_port }}</code>
-              <code v-else class="mt-2 block truncate text-cyan-100">{{ row.tunnel.custom_domain || '未配置' }}</code>
+              <div v-else-if="row.tunnel.custom_domain" class="mt-2 grid gap-1">
+                <code v-for="domain in customDomains(row.tunnel.custom_domain)" :key="domain" class="block truncate text-cyan-100">{{ domain }}</code>
+              </div>
+              <code v-else class="mt-2 block truncate text-cyan-100">未配置</code>
             </div>
           </div>
         </div>

@@ -20,6 +20,10 @@ function formatBytes(value: number) {
   return `${(value / 1024 / 1024 / 1024).toFixed(1)} GiB`
 }
 
+function customDomains(value: string | null) {
+  return value?.split(',').map((domain) => domain.trim()).filter(Boolean) || []
+}
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -114,7 +118,9 @@ onMounted(load)
             <div class="rounded-2xl border border-cyan-300/10 bg-cyan-300/[0.04] px-4 py-3">
               <div class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Entry</div>
               <code v-if="row.tunnel.remote_port" class="mt-2 block text-cyan-100">:{{ row.tunnel.remote_port }}</code>
-              <a v-else-if="row.tunnel.custom_domain" class="mt-2 block break-all text-cyan-100" :href="`${row.tunnel.protocol}://${row.tunnel.custom_domain}`" target="_blank">{{ row.tunnel.protocol }}://{{ row.tunnel.custom_domain }}</a>
+              <div v-else-if="row.tunnel.custom_domain" class="mt-2 grid gap-1">
+                <a v-for="domain in customDomains(row.tunnel.custom_domain)" :key="domain" class="block break-all text-cyan-100" :href="`${row.tunnel.protocol}://${domain}`" target="_blank">{{ row.tunnel.protocol }}://{{ domain }}</a>
+              </div>
               <span v-else class="mt-2 block text-sm text-slate-500">未配置</span>
             </div>
           </div>

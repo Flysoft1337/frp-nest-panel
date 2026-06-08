@@ -14,7 +14,12 @@ const copyStatus = ref('')
 
 function tunnelEntry(value: FrpcResponse) {
   if (value.tunnel.remote_port) return String(value.tunnel.remote_port)
-  if (value.tunnel.custom_domain) return `${value.tunnel.protocol}://${value.tunnel.custom_domain}`
+  if (value.tunnel.custom_domain) {
+    return value.tunnel.custom_domain
+      .split(',')
+      .map((domain) => `${value.tunnel.protocol}://${domain.trim()}`)
+      .join('\n')
+  }
   return '未配置'
 }
 
@@ -59,7 +64,7 @@ onMounted(load)
         </div>
         <div class="rounded-2xl border border-cyan-300/10 bg-cyan-300/[0.04] px-4 py-3">
           <div class="text-xs text-slate-500">入口</div>
-          <code class="mt-2 block truncate text-cyan-100">{{ tunnelEntry(data) }}</code>
+          <code class="mt-2 block whitespace-pre-wrap break-all text-cyan-100">{{ tunnelEntry(data) }}</code>
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-3">
