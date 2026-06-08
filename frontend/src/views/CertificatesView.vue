@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 import { createCertificate, deleteCertificate, listCertificates } from '../api/certificates'
 import type { CertificateInfo } from '../api/types'
@@ -15,6 +15,7 @@ const privateKeyPem = ref('')
 const error = ref('')
 const message = ref('')
 const loading = ref(false)
+const certificateCountLabel = computed(() => `${certificates.value.length} 张证书`)
 
 async function load() {
   certificates.value = await listCertificates()
@@ -69,16 +70,32 @@ onMounted(async () => {
 
   <section class="grid gap-6 xl:grid-cols-[1fr_28rem]">
     <div class="card p-6">
-      <h2 class="mb-4 text-lg font-bold text-white">已上传证书</h2>
-      <div v-if="certificates.length === 0" class="empty-state text-sm text-slate-400">还没有证书</div>
+      <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-bold text-white">已上传证书</h2>
+          <p class="mt-1 text-sm text-slate-400">HTTPS 上传证书模式会从这里选择证书。</p>
+        </div>
+        <span class="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold text-cyan-100">{{ certificateCountLabel }}</span>
+      </div>
+      <div v-if="certificates.length === 0" class="empty-state">
+        <div class="text-base font-bold text-white">还没有证书</div>
+        <p class="mt-2 max-w-md text-sm text-slate-400">上传证书和私钥后，创建 HTTPS 域名隧道时可以直接选择。</p>
+      </div>
       <div v-else class="grid gap-3">
-        <article v-for="cert in certificates" :key="cert.id" class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+        <article v-for="cert in certificates" :key="cert.id" class="rounded-3xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-cyan-300/20 hover:bg-white/[0.05]">
           <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h3 class="font-bold text-white">{{ cert.name }}</h3>
-              <p class="mt-1 break-all text-sm text-cyan-100">{{ cert.domains.join(', ') }}</p>
-              <p class="mt-2 text-xs text-slate-500">过期时间：{{ cert.not_after }}</p>
-              <p class="mt-1 break-all font-mono text-xs text-slate-500">SHA256 {{ cert.fingerprint_sha256 }}</p>
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 class="font-bold text-white">{{ cert.name }}</h3>
+                <span class="rounded-full bg-white/10 px-2.5 py-1 text-xs text-slate-300">{{ cert.domains.length }} 个域名</span>
+              </div>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <code v-for="domain in cert.domains" :key="domain" class="rounded-full border border-cyan-300/15 bg-cyan-300/[0.06] px-2.5 py-1 text-xs text-cyan-100">{{ domain }}</code>
+              </div>
+              <div class="mt-4 grid gap-2 text-xs text-slate-500 md:grid-cols-2">
+                <div>过期时间：<span class="font-mono text-slate-300">{{ cert.not_after }}</span></div>
+                <div class="break-all font-mono">SHA256 {{ cert.fingerprint_sha256 }}</div>
+              </div>
             </div>
             <ConfirmButton message="确定删除这个证书吗？使用中的证书不能删除。" @confirm="remove(cert.id)">删除</ConfirmButton>
           </div>
@@ -87,11 +104,15 @@ onMounted(async () => {
     </div>
 
     <section class="card p-6">
-      <h2 class="mb-4 text-lg font-bold text-white">上传证书</h2>
+      <div class="mb-5">
+        <h2 class="text-lg font-bold text-white">上传证书</h2>
+        <p class="mt-1 text-sm text-slate-400">粘贴完整 PEM 内容。私钥只保存到后端，不会在页面回显。</p>
+      </div>
       <form class="grid gap-4" @submit.prevent="submit">
         <FormField label="证书名称"><input v-model="name" required placeholder="example.com" /></FormField>
         <FormField label="证书 PEM"><textarea v-model="certificatePem" required rows="8" placeholder="-----BEGIN CERTIFICATE-----" /></FormField>
         <FormField label="私钥 PEM"><textarea v-model="privateKeyPem" required rows="8" placeholder="-----BEGIN PRIVATE KEY-----" /></FormField>
+        <div class="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">证书需要包含绑定域名。通配符证书可以用于对应子域名。</div>
         <button class="btn-primary w-fit" :disabled="loading" type="submit">{{ loading ? '上传中' : '上传证书' }}</button>
       </form>
     </section>
