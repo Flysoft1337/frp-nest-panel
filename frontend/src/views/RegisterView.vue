@@ -29,11 +29,16 @@ async function submit() {
 </script>
 
 <template>
-  <section class="mx-auto grid min-h-[60vh] max-w-md place-items-center">
+  <section class="mx-auto grid min-h-[65vh] max-w-md place-items-center">
     <div class="card w-full p-7">
-      <p class="mb-2 text-xs font-bold uppercase tracking-[0.25em] text-cyan-200/80">Invite</p>
-      <h1 class="text-3xl font-black tracking-tight text-white">邀请码注册</h1>
-      <p class="mt-2 text-sm text-slate-400">输入管理员提供的邀请码后即可创建自己的隧道。</p>
+      <div class="mb-6 flex items-center gap-3">
+        <div class="grid h-12 w-12 place-items-center rounded-2xl bg-cyan-300 text-lg font-black text-slate-950 shadow-lg shadow-cyan-500/20">N</div>
+        <div>
+          <p class="text-xs font-bold uppercase tracking-[0.25em] text-cyan-200/80">Invite</p>
+          <h1 class="text-3xl font-black tracking-tight text-white">邀请码注册</h1>
+        </div>
+      </div>
+      <p class="text-sm text-slate-400">输入管理员提供的邀请码后即可创建自己的隧道。</p>
 
       <form class="mt-7 grid gap-4" @submit.prevent="submit">
         <label>邀请码<input v-model="inviteCode" required /></label>

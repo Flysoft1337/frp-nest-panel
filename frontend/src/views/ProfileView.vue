@@ -51,8 +51,8 @@ onMounted(async () => {
 
   <section class="grid gap-6 xl:grid-cols-[1fr_24rem]">
     <div v-if="summary" class="grid gap-4 md:grid-cols-3">
-      <div class="card p-6">
-        <div class="text-sm text-slate-400">用户名</div>
+      <div class="card border-cyan-300/20 bg-cyan-300/[0.06] p-6">
+        <div class="text-sm text-cyan-100/80">用户名</div>
         <div class="mt-2 text-2xl font-black text-white">{{ summary.username }}</div>
       </div>
       <div class="card p-6">
@@ -73,7 +73,7 @@ onMounted(async () => {
       </div>
       <div class="card p-6">
         <div class="text-sm text-slate-400">剩余额度</div>
-        <div class="mt-2 text-2xl font-black text-white">{{ summary.remaining_tunnels }}</div>
+        <div class="mt-2 text-2xl font-black" :class="summary.remaining_tunnels > 0 ? 'text-emerald-200' : 'text-red-200'">{{ summary.remaining_tunnels }}</div>
       </div>
     </div>
 
