@@ -28,11 +28,16 @@ async function submit() {
 </script>
 
 <template>
-  <section class="mx-auto grid min-h-[60vh] max-w-md place-items-center">
+  <section class="mx-auto grid min-h-[65vh] max-w-md place-items-center">
     <div class="card w-full p-7">
-      <p class="mb-2 text-xs font-bold uppercase tracking-[0.25em] text-cyan-200/80">Sign in</p>
-      <h1 class="text-3xl font-black tracking-tight text-white">登录面板</h1>
-      <p class="mt-2 text-sm text-slate-400">管理你的 TCP/UDP 隧道和 frpc 配置。</p>
+      <div class="mb-6 flex items-center gap-3">
+        <div class="grid h-12 w-12 place-items-center rounded-2xl bg-cyan-300 text-lg font-black text-slate-950 shadow-lg shadow-cyan-500/20">N</div>
+        <div>
+          <p class="text-xs font-bold uppercase tracking-[0.25em] text-cyan-200/80">Sign in</p>
+          <h1 class="text-3xl font-black tracking-tight text-white">登录面板</h1>
+        </div>
+      </div>
+      <p class="text-sm text-slate-400">管理你的 TCP、UDP、HTTP 和 HTTPS 隧道。</p>
 
       <form class="mt-7 grid gap-4" @submit.prevent="submit">
         <label>用户名<input v-model="username" autocomplete="username" required /></label>

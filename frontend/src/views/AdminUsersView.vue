@@ -9,6 +9,7 @@ import ConfirmButton from '../components/ConfirmButton.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import QuotaEditor from '../components/QuotaEditor.vue'
+import SelectField from '../components/SelectField.vue'
 import StatusPill from '../components/StatusPill.vue'
 import Toolbar from '../components/Toolbar.vue'
 import { useSessionStore } from '../stores/session'
@@ -22,6 +23,11 @@ const status = ref('')
 const currentPage = ref(1)
 const error = ref('')
 const message = ref('')
+const statusOptions = [
+  { label: '全部状态', value: '' },
+  { label: '正常', value: 'enabled' },
+  { label: '已禁用', value: 'disabled' },
+]
 
 const totalPages = computed(() => {
   if (!page.value) return 1
@@ -109,11 +115,7 @@ onMounted(async () => {
 
     <Toolbar>
       <input v-model="q" placeholder="搜索用户名" />
-      <select v-model="status">
-        <option value="">全部状态</option>
-        <option value="enabled">正常</option>
-        <option value="disabled">已禁用</option>
-      </select>
+      <SelectField v-model="status" :options="statusOptions" />
     </Toolbar>
 
     <div class="grid gap-3">

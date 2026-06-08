@@ -64,6 +64,14 @@
     @apply border border-red-300/20 bg-red-400/10 text-red-200 hover:bg-red-400/20;
   }
 
+  .nav-link {
+    @apply rounded-2xl px-3 py-2 text-sm font-semibold text-slate-300 no-underline transition hover:bg-white/10 hover:text-white;
+  }
+
+  .nav-link-active {
+    @apply bg-cyan-300 text-slate-950 shadow-lg shadow-cyan-500/20 hover:bg-cyan-300 hover:text-slate-950;
+  }
+
   .card {
     @apply rounded-3xl border border-white/10 bg-white/[0.06] shadow-2xl shadow-slate-950/40 backdrop-blur-xl;
   }
@@ -100,8 +108,13 @@
     @apply border-red-300/20 bg-red-300/10 text-red-100;
   }
 
+  .empty-state {
+    @apply grid place-items-center rounded-3xl border border-dashed border-white/10 bg-white/[0.03] px-6 py-14 text-center;
+  }
+
   .table-wrap {
     @apply overflow-x-auto rounded-2xl border border-white/10;
+    scrollbar-color: rgba(103, 232, 249, 0.45) rgba(15, 23, 42, 0.7);
   }
 
   .data-table {
@@ -123,6 +136,21 @@
 
   .data-table tbody tr {
     @apply transition hover:bg-white/[0.04];
+  }
+
+  .table-wrap::-webkit-scrollbar {
+    height: 0.65rem;
+  }
+
+  .table-wrap::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.7);
+    border-radius: 999px;
+  }
+
+  .table-wrap::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, rgba(103, 232, 249, 0.7), rgba(34, 211, 238, 0.35));
+    border: 2px solid rgba(15, 23, 42, 0.7);
+    border-radius: 999px;
   }
 
   .quota-input {

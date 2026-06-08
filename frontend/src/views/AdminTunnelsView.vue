@@ -8,6 +8,7 @@ import AlertBox from '../components/AlertBox.vue'
 import ConfirmButton from '../components/ConfirmButton.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
+import SelectField from '../components/SelectField.vue'
 import StatusPill from '../components/StatusPill.vue'
 import Toolbar from '../components/Toolbar.vue'
 
@@ -17,6 +18,13 @@ const status = ref('')
 const currentPage = ref(1)
 const error = ref('')
 const message = ref('')
+const protocolOptions = [
+  { label: '全部协议', value: '' },
+  { label: 'TCP', value: 'tcp' },
+  { label: 'UDP', value: 'udp' },
+  { label: 'HTTP', value: 'http' },
+  { label: 'HTTPS', value: 'https' },
+]
 
 const totalPages = computed(() => {
   if (!page.value) return 1
@@ -65,13 +73,7 @@ onMounted(async () => {
 
     <Toolbar>
       <input v-model="q" placeholder="搜索名称、本地地址、远程端口、域名或用户名" />
-      <select v-model="status">
-        <option value="">全部协议</option>
-        <option value="tcp">TCP</option>
-        <option value="udp">UDP</option>
-        <option value="http">HTTP</option>
-        <option value="https">HTTPS</option>
-      </select>
+      <SelectField v-model="status" :options="protocolOptions" />
     </Toolbar>
 
     <div class="grid gap-3">

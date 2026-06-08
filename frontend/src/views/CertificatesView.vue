@@ -70,7 +70,7 @@ onMounted(async () => {
   <section class="grid gap-6 xl:grid-cols-[1fr_28rem]">
     <div class="card p-6">
       <h2 class="mb-4 text-lg font-bold text-white">已上传证书</h2>
-      <div v-if="certificates.length === 0" class="rounded-3xl border border-dashed border-white/10 py-12 text-center text-sm text-slate-400">还没有证书</div>
+      <div v-if="certificates.length === 0" class="empty-state text-sm text-slate-400">还没有证书</div>
       <div v-else class="grid gap-3">
         <article v-for="cert in certificates" :key="cert.id" class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
           <div class="flex flex-wrap items-start justify-between gap-3">

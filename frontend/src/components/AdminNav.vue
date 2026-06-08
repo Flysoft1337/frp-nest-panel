@@ -9,14 +9,14 @@ const links = [
 </script>
 
 <template>
-  <nav class="card mb-6 flex flex-wrap gap-2 p-2">
+  <nav class="mb-6 flex w-full gap-2 overflow-x-auto rounded-3xl border border-white/10 bg-white/[0.04] p-2 shadow-2xl shadow-slate-950/30 backdrop-blur-xl">
     <RouterLink
       v-for="link in links"
       :key="link.to"
       :to="link.to"
-      class="rounded-2xl px-4 py-2 text-sm font-semibold text-slate-300 no-underline transition hover:bg-white/10 hover:text-white"
-      active-class="bg-cyan-300 text-slate-950 hover:bg-cyan-300 hover:text-slate-950"
-      :class="$route.path === link.to ? 'bg-cyan-300 text-slate-950 hover:bg-cyan-300 hover:text-slate-950' : ''"
+      class="shrink-0 rounded-2xl px-4 py-2 text-sm font-semibold text-slate-300 no-underline transition hover:bg-white/10 hover:text-white"
+      active-class="bg-cyan-300 text-slate-950 shadow-lg shadow-cyan-500/20 hover:bg-cyan-300 hover:text-slate-950"
+      :class="$route.path === link.to ? 'bg-cyan-300 text-slate-950 shadow-lg shadow-cyan-500/20 hover:bg-cyan-300 hover:text-slate-950' : ''"
     >
       {{ link.label }}
     </RouterLink>

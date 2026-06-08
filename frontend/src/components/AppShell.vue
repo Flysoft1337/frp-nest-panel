@@ -30,11 +30,11 @@ async function signOut() {
           </div>
         </RouterLink>
 
-        <nav v-if="session.isAuthenticated" class="flex flex-wrap items-center gap-2">
-          <RouterLink class="rounded-2xl px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white" to="/dashboard">Dashboard</RouterLink>
-          <RouterLink class="rounded-2xl px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white" to="/certificates">证书</RouterLink>
-          <RouterLink v-if="session.isAdmin" class="rounded-2xl px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white" to="/admin">管理</RouterLink>
-          <RouterLink class="rounded-2xl px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white" to="/profile">个人资料</RouterLink>
+        <nav v-if="session.isAuthenticated" class="flex flex-wrap items-center gap-2 rounded-3xl border border-white/10 bg-slate-950/30 p-1.5">
+          <RouterLink class="nav-link" active-class="nav-link-active" to="/dashboard">Dashboard</RouterLink>
+          <RouterLink class="nav-link" active-class="nav-link-active" to="/certificates">证书</RouterLink>
+          <RouterLink v-if="session.isAdmin" class="nav-link" active-class="nav-link-active" to="/admin">管理</RouterLink>
+          <RouterLink class="nav-link" active-class="nav-link-active" to="/profile">个人资料</RouterLink>
           <button class="btn-secondary" type="button" @click="signOut">退出</button>
         </nav>
       </header>

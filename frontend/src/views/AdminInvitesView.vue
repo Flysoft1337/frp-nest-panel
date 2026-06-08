@@ -9,6 +9,7 @@ import ConfirmButton from '../components/ConfirmButton.vue'
 import FormField from '../components/FormField.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
+import SelectField from '../components/SelectField.vue'
 import StatusPill from '../components/StatusPill.vue'
 import Toolbar from '../components/Toolbar.vue'
 
@@ -20,6 +21,12 @@ const status = ref('')
 const currentPage = ref(1)
 const error = ref('')
 const message = ref('')
+const statusOptions = [
+  { label: '全部状态', value: '' },
+  { label: '未使用', value: 'unused' },
+  { label: '已使用', value: 'used' },
+  { label: '已过期', value: 'expired' },
+]
 
 const totalPages = computed(() => {
   if (!page.value) return 1
@@ -100,12 +107,7 @@ onMounted(async () => {
   <section class="card mt-6 p-6">
     <Toolbar>
       <input v-model="q" placeholder="搜索邀请码" />
-      <select v-model="status">
-        <option value="">全部状态</option>
-        <option value="unused">未使用</option>
-        <option value="used">已使用</option>
-        <option value="expired">已过期</option>
-      </select>
+      <SelectField v-model="status" :options="statusOptions" />
     </Toolbar>
 
     <div class="grid gap-3">

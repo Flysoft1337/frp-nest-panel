@@ -77,7 +77,7 @@ onMounted(load)
       <span v-if="error" class="text-sm text-red-200">{{ error }}</span>
     </div>
 
-    <div v-if="!loading && tunnels.length === 0" class="grid place-items-center rounded-3xl border border-dashed border-white/10 py-16 text-center">
+    <div v-if="!loading && tunnels.length === 0" class="empty-state">
       <h2 class="text-xl font-bold text-white">还没有隧道</h2>
       <p class="mt-2 text-sm text-slate-400">创建一个 TCP 或 UDP 隧道后，这里会显示配置入口。</p>
       <RouterLink class="btn-primary mt-6" role="button" to="/tunnels/new">创建第一个隧道</RouterLink>
