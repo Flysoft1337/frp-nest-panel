@@ -2,6 +2,8 @@
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import AlertBox from '../components/AlertBox.vue'
+import FormField from '../components/FormField.vue'
 import { useSessionStore } from '../stores/session'
 
 const route = useRoute()
@@ -41,10 +43,10 @@ async function submit() {
       <p class="text-sm text-slate-400">输入管理员提供的邀请码后即可创建自己的隧道。</p>
 
       <form class="mt-7 grid gap-4" @submit.prevent="submit">
-        <label>邀请码<input v-model="inviteCode" required /></label>
-        <label>用户名<input v-model="username" autocomplete="username" required /></label>
-        <label>密码<input v-model="password" autocomplete="new-password" minlength="8" required type="password" /></label>
-        <p v-if="error" class="rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{{ error }}</p>
+        <FormField label="邀请码"><input v-model="inviteCode" required /></FormField>
+        <FormField label="用户名"><input v-model="username" autocomplete="username" required /></FormField>
+        <FormField label="密码"><input v-model="password" autocomplete="new-password" minlength="8" required type="password" /></FormField>
+        <AlertBox v-if="error" tone="danger" :message="error" />
         <button class="btn-primary w-full" :disabled="loading" type="submit">{{ loading ? '注册中' : '注册' }}</button>
       </form>
 
