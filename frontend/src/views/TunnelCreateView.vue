@@ -7,6 +7,7 @@ import { createTunnel, getTunnel, updateTunnel } from '../api/tunnels'
 import type { CertificateInfo } from '../api/types'
 import FormField from '../components/FormField.vue'
 import PageHeader from '../components/PageHeader.vue'
+import SelectField from '../components/SelectField.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -27,6 +28,23 @@ const certificates = ref<CertificateInfo[]>([])
 const error = ref('')
 const loading = ref(false)
 const loadingTunnel = ref(false)
+const protocolOptions = [
+  { label: 'TCP', value: 'tcp' },
+  { label: 'UDP', value: 'udp' },
+  { label: 'HTTP 域名', value: 'http' },
+  { label: 'HTTPS 域名', value: 'https' },
+]
+const tlsModeOptions = [
+  { label: 'HTTPS 透传，本地服务自己处理 TLS', value: 'https_passthrough' },
+  { label: '上传证书，转发到本地 HTTP', value: 'uploaded_cert' },
+]
+const certificateOptions = computed(() => [
+  { label: '选择证书', value: null, disabled: true },
+  ...certificates.value.map((cert) => ({
+    label: `${cert.name} · ${cert.domains.join(', ')}`,
+    value: cert.id,
+  })),
+])
 
 async function loadTunnel() {
   if (!tunnelId.value) return
@@ -97,32 +115,15 @@ onMounted(async () => {
     <p v-if="loadingTunnel" class="mb-4 text-sm text-slate-400">加载中</p>
     <form class="grid gap-5" @submit.prevent="submit">
       <FormField label="隧道名称"><input v-model="name" placeholder="mc-server" required /></FormField>
-      <FormField label="协议">
-        <select v-model="protocol" required>
-          <option value="tcp">TCP</option>
-          <option value="udp">UDP</option>
-          <option value="http">HTTP 域名</option>
-          <option value="https">HTTPS 域名</option>
-        </select>
-      </FormField>
+      <FormField label="协议"><SelectField v-model="protocol" :options="protocolOptions" /></FormField>
       <div class="grid gap-5 md:grid-cols-2">
         <FormField label="本地地址"><input v-model="localHost" required /></FormField>
         <FormField label="本地端口"><input v-model="localPort" max="65535" min="1" required type="number" /></FormField>
       </div>
       <FormField v-if="!isEdit && isPortTunnel" label="远程端口（可选)"><input v-model="remotePort" max="65535" min="1" placeholder="留空自动分配" type="number" /></FormField>
       <FormField v-if="isDomainTunnel" label="绑定域名"><input v-model="customDomain" required placeholder="example.com" /></FormField>
-      <FormField v-if="protocol === 'https'" label="TLS 模式">
-        <select v-model="tlsMode" required>
-          <option value="https_passthrough">HTTPS 透传，本地服务自己处理 TLS</option>
-          <option value="uploaded_cert">上传证书，转发到本地 HTTP</option>
-        </select>
-      </FormField>
-      <FormField v-if="protocol === 'https' && tlsMode === 'uploaded_cert'" label="证书">
-        <select v-model="certificateId" required>
-          <option :value="null" disabled>选择证书</option>
-          <option v-for="cert in certificates" :key="cert.id" :value="cert.id">{{ cert.name }} · {{ cert.domains.join(', ') }}</option>
-        </select>
-      </FormField>
+      <FormField v-if="protocol === 'https'" label="TLS 模式"><SelectField v-model="tlsMode" :options="tlsModeOptions" /></FormField>
+      <FormField v-if="protocol === 'https' && tlsMode === 'uploaded_cert'" label="证书"><SelectField v-model="certificateId" :options="certificateOptions" /></FormField>
       <div v-if="isDomainTunnel" class="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
         域名需要解析到 frps 服务器。HTTPS 上传证书模式会生成包含证书和私钥的 frpc.zip。
       </div>

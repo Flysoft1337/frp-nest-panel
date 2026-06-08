@@ -51,6 +51,12 @@ pub fn router() -> Router<AppState> {
             "/api/admin/panel-tls",
             get(admin::panel_tls_status).put(admin::update_panel_tls),
         )
+        .route("/api/admin/panel/restart", post(admin::restart_panel))
+        .route(
+            "/api/admin/caddy",
+            get(admin::caddy_status).put(admin::update_caddy),
+        )
+        .route("/api/admin/caddy/reload", post(admin::reload_caddy))
         .route(
             "/api/admin/invites",
             get(admin::invites).post(admin::create_invite),

@@ -3,6 +3,7 @@ import type {
   AdminSummary,
   AdminTrafficSummary,
   AdminTunnelRow,
+  CaddyStatus,
   ConfigResponse,
   FrpsStatus,
   FrpsUpdate,
@@ -96,6 +97,10 @@ export function restartFrps() {
   return api<{ ok: boolean }>('/api/admin/frps/restart', { method: 'POST' })
 }
 
+export function restartPanel() {
+  return api<{ ok: boolean }>('/api/admin/panel/restart', { method: 'POST' })
+}
+
 export function getPanelTls() {
   return api<PanelTlsStatus>('/api/admin/panel-tls')
 }
@@ -103,8 +108,21 @@ export function getPanelTls() {
 export function updatePanelTls(form: {
   enabled: boolean
   bind: string
+  domain: string
   certificate_pem?: string | null
   private_key_pem?: string | null
 }) {
   return api<PanelTlsStatus>('/api/admin/panel-tls', { method: 'PUT', json: form })
+}
+
+export function getCaddy() {
+  return api<CaddyStatus>('/api/admin/caddy')
+}
+
+export function updateCaddy(form: { enabled: boolean; domain: string }) {
+  return api<CaddyStatus>('/api/admin/caddy', { method: 'PUT', json: form })
+}
+
+export function reloadCaddy() {
+  return api<CaddyStatus>('/api/admin/caddy/reload', { method: 'POST' })
 }

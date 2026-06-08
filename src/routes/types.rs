@@ -212,9 +212,19 @@ pub struct FrpsStatusResponse {
 pub struct PanelTlsResponse {
     pub enabled: bool,
     pub bind: String,
+    pub domain: String,
     pub domains: Vec<String>,
-    pub not_after: Option<DateTime<FixedOffset>>,
+    pub not_after: Option<String>,
     pub fingerprint_sha256: String,
+}
+
+#[derive(Serialize)]
+pub struct CaddyResponse {
+    pub enabled: bool,
+    pub domain: String,
+    pub config_path: String,
+    pub available: bool,
+    pub upstream: String,
 }
 
 #[derive(Serialize)]

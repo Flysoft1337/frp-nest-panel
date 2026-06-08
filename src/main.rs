@@ -9,7 +9,14 @@ mod state;
 
 use std::sync::{atomic::AtomicBool, Arc};
 
-use axum::{routing::get, Router};
+use axum::{
+    extract::Request,
+    http::{header::HOST, StatusCode},
+    middleware::{self, Next},
+    response::Response,
+    routing::get,
+    Router,
+};
 use migration::{Migrator, MigratorTrait};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, Database, EntityTrait};
 use tokio::{net::TcpListener, sync::RwLock};
@@ -31,6 +38,8 @@ use crate::{
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -62,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
         .with_expiry(Expiry::OnInactivity(Duration::days(7)))
         .with_signed(key);
 
-    let app = Router::new()
+    let mut app = Router::new()
         .merge(routes::router())
         .nest_service("/assets", ServeDir::new("frontend/dist/assets"))
         .route_service("/icons.svg", ServeFile::new("frontend/dist/icons.svg"))
@@ -72,11 +81,37 @@ async fn main() -> anyhow::Result<()> {
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 
-    let panel_tls = crate::services::panel_tls::load_config()
+    let caddy = crate::services::caddy::load_config()
         .await
         .unwrap_or_default();
+    tracing::info!(
+        enabled = caddy.enabled,
+        domain = %caddy.domain,
+        "panel Caddy config loaded"
+    );
+    if caddy.enabled {
+        app = app.layer(middleware::from_fn(move |request, next| {
+            enforce_panel_host(request, next, caddy.domain.clone())
+        }));
+    }
+
+    let panel_tls = match crate::services::panel_tls::load_config().await {
+        Ok(config) => config,
+        Err(error) => {
+            tracing::error!(%error, "failed to load panel TLS config");
+            Default::default()
+        }
+    };
+    tracing::info!(
+        enabled = panel_tls.enabled,
+        bind = %panel_tls.bind,
+        domain = %panel_tls.domain,
+        "panel TLS config loaded"
+    );
     if panel_tls.enabled {
-        let tls_app = app.clone();
+        let tls_app = app.clone().layer(middleware::from_fn(move |request, next| {
+            enforce_panel_host(request, next, panel_tls.domain.clone())
+        }));
         let tls_bind = panel_tls.bind.clone();
         tokio::spawn(async move {
             let Ok(config) = axum_server::tls_rustls::RustlsConfig::from_pem_file(
@@ -114,6 +149,30 @@ async fn main() -> anyhow::Result<()> {
     );
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+async fn enforce_panel_host(
+    request: Request,
+    next: Next,
+    domain: String,
+) -> Result<Response, StatusCode> {
+    let host = request
+        .uri()
+        .authority()
+        .map(|authority| authority.host())
+        .or_else(|| {
+            request
+                .headers()
+                .get(HOST)
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| value.split(':').next())
+        })
+        .unwrap_or_default();
+    if host.eq_ignore_ascii_case(&domain) {
+        Ok(next.run(request).await)
+    } else {
+        Err(StatusCode::NOT_FOUND)
+    }
 }
 
 async fn ensure_initial_admin(

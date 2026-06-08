@@ -145,9 +145,18 @@ export interface CertificateInfo {
 export interface PanelTlsStatus {
   enabled: boolean
   bind: string
+  domain: string
   domains: string[]
   not_after: string | null
   fingerprint_sha256: string
+}
+
+export interface CaddyStatus {
+  enabled: boolean
+  domain: string
+  config_path: string
+  available: boolean
+  upstream: string
 }
 
 export interface ConfigResponse {

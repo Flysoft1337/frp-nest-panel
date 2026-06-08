@@ -19,10 +19,11 @@ use crate::{
     error::{AppError, AppResult},
     routes::types::{
         AdminSummaryResponse, AdminTrafficSummaryResponse, AdminTunnelResponse,
-        AdminTunnelTrafficResponse, ConfigResponse, FrpsStatusResponse, InviteResponse, OkResponse,
-        PageResponse, PanelTlsResponse, PublicUser, TunnelResponse, UserRowResponse,
+        AdminTunnelTrafficResponse, CaddyResponse, ConfigResponse, FrpsStatusResponse,
+        InviteResponse, OkResponse, PageResponse, PanelTlsResponse, PublicUser, TunnelResponse,
+        UserRowResponse,
     },
-    services::{frps, invite, password, validation},
+    services::{caddy, frps, invite, password, validation},
     state::AppState,
 };
 
@@ -54,8 +55,15 @@ pub struct ListQuery {
 pub struct PanelTlsForm {
     enabled: bool,
     bind: String,
+    domain: String,
     certificate_pem: Option<String>,
     private_key_pem: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct CaddyForm {
+    enabled: bool,
+    domain: String,
 }
 
 #[derive(Deserialize)]
@@ -437,6 +445,7 @@ pub async fn panel_tls_status(AdminUser(_user): AdminUser) -> AppResult<impl Int
     Ok(Json(PanelTlsResponse {
         enabled: config.enabled,
         bind: config.bind,
+        domain: config.domain,
         domains: config.domains,
         not_after: config.not_after,
         fingerprint_sha256: config.fingerprint_sha256,
@@ -450,6 +459,7 @@ pub async fn update_panel_tls(
     let config = crate::services::panel_tls::save_config(
         form.enabled,
         form.bind,
+        form.domain,
         form.certificate_pem
             .filter(|value| !value.trim().is_empty()),
         form.private_key_pem
@@ -459,10 +469,45 @@ pub async fn update_panel_tls(
     Ok(Json(PanelTlsResponse {
         enabled: config.enabled,
         bind: config.bind,
+        domain: config.domain,
         domains: config.domains,
         not_after: config.not_after,
         fingerprint_sha256: config.fingerprint_sha256,
     }))
+}
+
+pub async fn restart_panel(AdminUser(_user): AdminUser) -> AppResult<impl IntoResponse> {
+    tokio::spawn(async move {
+        if let Err(error) = crate::services::panel_tls::restart_panel().await {
+            tracing::error!(%error, "failed to restart panel");
+        }
+    });
+    Ok(Json(OkResponse { ok: true }))
+}
+
+pub async fn caddy_status(
+    State(state): State<AppState>,
+    AdminUser(_user): AdminUser,
+) -> AppResult<impl IntoResponse> {
+    let config = caddy::load_config().await.unwrap_or_default();
+    Ok(Json(caddy_response(config, state.config.app_bind).await))
+}
+
+pub async fn update_caddy(
+    State(state): State<AppState>,
+    AdminUser(_user): AdminUser,
+    Json(form): Json<CaddyForm>,
+) -> AppResult<impl IntoResponse> {
+    let config = caddy::save_config(form.enabled, form.domain, state.config.app_bind).await?;
+    Ok(Json(caddy_response(config, state.config.app_bind).await))
+}
+
+pub async fn reload_caddy(
+    State(state): State<AppState>,
+    AdminUser(_user): AdminUser,
+) -> AppResult<impl IntoResponse> {
+    let config = caddy::reload_config(state.config.app_bind).await?;
+    Ok(Json(caddy_response(config, state.config.app_bind).await))
 }
 
 pub async fn frps_status(
@@ -601,6 +646,19 @@ async fn set_user_disabled(state: &AppState, id: Uuid, disabled: bool) -> AppRes
     active.disabled = Set(disabled);
     active.update(&state.db).await?;
     Ok(())
+}
+
+async fn caddy_response(
+    config: caddy::CaddyPanelConfig,
+    upstream: std::net::SocketAddr,
+) -> CaddyResponse {
+    CaddyResponse {
+        enabled: config.enabled,
+        domain: config.domain,
+        config_path: caddy::CADDY_CONFIG_PATH.to_owned(),
+        available: caddy::caddy_available().await,
+        upstream: caddy::upstream_from_bind(upstream),
+    }
 }
 
 fn effective_max_tunnels(user: &users::Model, default_max_tunnels: u64) -> u64 {

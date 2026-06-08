@@ -13,6 +13,32 @@
   select,
   textarea {
     @apply w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300/70 focus:ring-4 focus:ring-cyan-300/10;
+    scrollbar-color: rgba(103, 232, 249, 0.45) rgba(15, 23, 42, 0.7);
+  }
+
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+
+  input[type='number'] {
+    appearance: textfield;
+  }
+
+  textarea::-webkit-scrollbar {
+    width: 0.65rem;
+  }
+
+  textarea::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.7);
+    border-radius: 999px;
+  }
+
+  textarea::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(103, 232, 249, 0.7), rgba(34, 211, 238, 0.35));
+    border: 2px solid rgba(15, 23, 42, 0.7);
+    border-radius: 999px;
   }
 
   label {
@@ -44,6 +70,22 @@
 
   .field-note {
     @apply text-xs text-slate-500;
+  }
+
+  .select-trigger {
+    @apply flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-medium outline-none transition hover:bg-white/10 focus:border-cyan-300/70 focus:ring-4 focus:ring-cyan-300/10;
+  }
+
+  .select-menu {
+    @apply absolute left-0 right-0 top-[calc(100%+0.5rem)] z-40 overflow-hidden rounded-2xl border border-cyan-300/20 bg-slate-900/95 p-1 shadow-2xl shadow-slate-950/70 backdrop-blur-xl;
+  }
+
+  .select-option {
+    @apply flex w-full rounded-xl px-3 py-2.5 text-left text-sm text-slate-300 transition hover:bg-cyan-300/10 hover:text-cyan-100;
+  }
+
+  .select-option-active {
+    @apply bg-cyan-300/15 text-cyan-100;
   }
 
   .status-pill {

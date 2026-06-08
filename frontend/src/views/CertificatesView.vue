@@ -62,7 +62,7 @@ onMounted(async () => {
 <template>
   <PageHeader eyebrow="Certificates" title="SSL 证书" description="上传用于 HTTPS 域名隧道的证书和私钥。私钥不会在页面中回显。" />
 
-  <div class="mb-4 grid gap-3">
+  <div v-if="error || message" class="fixed right-6 top-6 z-50 grid w-[min(24rem,calc(100vw-3rem))] gap-3 shadow-2xl">
     <AlertBox v-if="error" tone="danger" :message="error" />
     <AlertBox v-if="message" tone="success" :message="message" />
   </div>

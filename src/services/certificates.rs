@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use openssl::{
     hash::MessageDigest,
     nid::Nid,
@@ -147,12 +147,19 @@ fn validate_key_matches(cert: &X509, key: &PKey<Private>) -> AppResult<()> {
     Ok(())
 }
 
+fn certificate_domain(value: &str) -> AppResult<String> {
+    if let Some(domain) = value.trim().strip_prefix("*.") {
+        return validation::domain(domain).map(|domain| format!("*.{domain}"));
+    }
+    validation::domain(value)
+}
+
 fn certificate_domains(cert: &X509) -> AppResult<Vec<String>> {
     let mut domains = Vec::new();
     if let Some(names) = cert.subject_alt_names() {
         for name in names {
             if let Some(dns) = name.dnsname() {
-                domains.push(validation::domain(dns)?);
+                domains.push(certificate_domain(dns)?);
             }
         }
     }
@@ -162,7 +169,7 @@ fn certificate_domains(cert: &X509) -> AppResult<Vec<String>> {
                 .data()
                 .as_utf8()
                 .map_err(|_| AppError::BadRequest("证书 CN 无法读取".to_owned()))?;
-            domains.push(validation::domain(cn.as_ref())?);
+            domains.push(certificate_domain(cn.as_ref())?);
         }
     }
     domains.sort();
@@ -174,8 +181,8 @@ fn certificate_domains(cert: &X509) -> AppResult<Vec<String>> {
 }
 
 fn openssl_time_to_chrono(value: &str) -> AppResult<DateTime<chrono::FixedOffset>> {
-    DateTime::parse_from_str(value, "%b %e %H:%M:%S %Y GMT")
-        .or_else(|_| DateTime::parse_from_str(value, "%b %d %H:%M:%S %Y GMT"))
-        .map(|time| time.fixed_offset())
+    NaiveDateTime::parse_from_str(value, "%b %e %H:%M:%S %Y GMT")
+        .or_else(|_| NaiveDateTime::parse_from_str(value, "%b %d %H:%M:%S %Y GMT"))
+        .map(|time| time.and_utc().fixed_offset())
         .map_err(|_| AppError::BadRequest("证书有效期无法解析".to_owned()))
 }
