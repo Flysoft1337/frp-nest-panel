@@ -1,15 +1,22 @@
 <template>
   <svg aria-hidden="true" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="4" y="4" width="56" height="56" rx="18" fill="url(#brand-bg)" />
-    <path d="M18 41.5V24.2c0-2.1 1.7-3.8 3.8-3.8h20.4c2.1 0 3.8 1.7 3.8 3.8v17.3" stroke="#082f49" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
-    <path d="M24 41.5v-13h16v13" stroke="#082f49" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
-    <path d="M14 43h36" stroke="#ecfeff" stroke-width="5" stroke-linecap="round" />
-    <path d="M20 49h24" stroke="#ecfeff" stroke-width="5" stroke-linecap="round" />
-    <circle cx="47" cy="18" r="4" fill="#ecfeff" />
+    <rect x="5" y="5" width="54" height="54" rx="16" fill="#020617" />
+    <rect x="5.75" y="5.75" width="52.5" height="52.5" rx="15.25" stroke="url(#brand-border)" stroke-width="1.5" />
+    <path d="M18 32h28" stroke="url(#brand-line)" stroke-width="5" stroke-linecap="round" />
+    <path d="M31 19v26" stroke="url(#brand-line)" stroke-width="5" stroke-linecap="round" />
+    <circle cx="18" cy="32" r="6" fill="#020617" stroke="#67e8f9" stroke-width="4" />
+    <circle cx="46" cy="32" r="6" fill="#020617" stroke="#67e8f9" stroke-width="4" />
+    <circle cx="31" cy="19" r="5" fill="#67e8f9" />
+    <circle cx="31" cy="45" r="5" fill="#67e8f9" />
+    <path d="M22 24l18 16" stroke="#ecfeff" stroke-width="3" stroke-linecap="round" opacity="0.9" />
     <defs>
-      <linearGradient id="brand-bg" x1="8" y1="8" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <linearGradient id="brand-border" x1="9" y1="8" x2="56" y2="58" gradientUnits="userSpaceOnUse">
         <stop stop-color="#67e8f9" />
-        <stop offset="0.52" stop-color="#22d3ee" />
+        <stop offset="0.55" stop-color="#22d3ee" />
+        <stop offset="1" stop-color="#0f766e" />
+      </linearGradient>
+      <linearGradient id="brand-line" x1="18" y1="19" x2="46" y2="45" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#67e8f9" />
         <stop offset="1" stop-color="#0f766e" />
       </linearGradient>
     </defs>
