@@ -1,4 +1,5 @@
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use uuid::Uuid;
 
 use crate::{
     entities::tunnels,
@@ -10,6 +11,7 @@ pub async fn validate_remote_port_available(
     remote_port: i32,
     min: i32,
     max: i32,
+    ignore_tunnel_id: Option<Uuid>,
 ) -> AppResult<i32> {
     if remote_port < min || remote_port > max {
         return Err(AppError::BadRequest("远程端口不在允许范围内".to_owned()));
@@ -18,7 +20,8 @@ pub async fn validate_remote_port_available(
         .filter(tunnels::Column::RemotePort.eq(remote_port))
         .one(db)
         .await?
-        .is_some();
+        .map(|tunnel| Some(tunnel.id) != ignore_tunnel_id)
+        .unwrap_or(false);
     if exists {
         return Err(AppError::BadRequest("远程端口已被占用".to_owned()));
     }

@@ -68,6 +68,7 @@ pub async fn create(
                         remote_port,
                         frps.remote_port_min,
                         frps.remote_port_max,
+                        None,
                     )
                     .await?
                 }
@@ -114,12 +115,14 @@ pub async fn update(
 ) -> AppResult<impl IntoResponse> {
     let tunnel = get_owned_tunnel(&state, user.id, id).await?;
     let input = validate_tunnel_form(&state, user.id, Some(id), form).await?;
+    let remote_port = update_remote_port(&state, &tunnel, &input).await?;
 
     let mut active: tunnels::ActiveModel = tunnel.into();
     active.name = Set(input.name);
     active.protocol = Set(input.protocol);
     active.local_host = Set(input.local_host);
     active.local_port = Set(input.local_port);
+    active.remote_port = Set(remote_port);
     active.custom_domain = Set(input.custom_domain);
     active.tls_mode = Set(input.tls_mode);
     active.certificate_id = Set(input.certificate_id);
@@ -326,6 +329,34 @@ async fn validate_tunnel_form(
         tls_mode,
         certificate_id,
     })
+}
+
+async fn update_remote_port(
+    state: &AppState,
+    tunnel: &tunnels::Model,
+    input: &ValidTunnelInput,
+) -> AppResult<Option<i32>> {
+    if !matches!(input.protocol.as_str(), "tcp" | "udp") {
+        return Ok(None);
+    }
+
+    let Some(remote_port) = input.requested_remote_port.or(tunnel.remote_port) else {
+        let frps = state.frps.read().await.clone();
+        return ports::allocate_remote_port(&state.db, frps.remote_port_min, frps.remote_port_max)
+            .await
+            .map(Some);
+    };
+
+    let frps = state.frps.read().await.clone();
+    ports::validate_remote_port_available(
+        &state.db,
+        remote_port,
+        frps.remote_port_min,
+        frps.remote_port_max,
+        Some(tunnel.id),
+    )
+    .await
+    .map(Some)
 }
 
 async fn insert_tunnel(
