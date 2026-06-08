@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import AlertBox from '../components/AlertBox.vue'
+import BrandIcon from '../components/BrandIcon.vue'
 import FormField from '../components/FormField.vue'
 import { useSessionStore } from '../stores/session'
 
@@ -33,7 +34,7 @@ async function submit() {
   <section class="mx-auto grid min-h-[65vh] max-w-md place-items-center">
     <div class="card w-full p-7">
       <div class="mb-6 flex items-center gap-3">
-        <div class="grid h-12 w-12 place-items-center rounded-2xl bg-cyan-300 text-lg font-black text-slate-950 shadow-lg shadow-cyan-500/20">N</div>
+        <BrandIcon class="h-12 w-12 drop-shadow-[0_12px_24px_rgba(34,211,238,0.22)]" />
         <div>
           <p class="text-xs font-bold uppercase tracking-[0.25em] text-cyan-200/80">Sign in</p>
           <h1 class="text-3xl font-black tracking-tight text-white">登录面板</h1>

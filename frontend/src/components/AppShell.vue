@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 
+import BrandIcon from './BrandIcon.vue'
 import { useSessionStore } from '../stores/session'
 
 const session = useSessionStore()
@@ -23,7 +24,7 @@ async function signOut() {
     <div class="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-5 sm:px-6 lg:px-8">
       <header class="card mb-8 flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between">
         <RouterLink to="/dashboard" class="flex items-center gap-3 text-slate-100 no-underline">
-          <div class="grid h-11 w-11 place-items-center rounded-2xl bg-cyan-300 text-lg font-black text-slate-950 shadow-lg shadow-cyan-500/20">N</div>
+          <BrandIcon class="h-11 w-11 drop-shadow-[0_12px_24px_rgba(34,211,238,0.22)]" />
           <div>
             <div class="text-base font-bold tracking-tight">frp-nest-panel</div>
             <div class="text-xs text-slate-400">Self-service frp tunnels</div>

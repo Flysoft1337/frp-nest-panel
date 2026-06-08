@@ -1,0 +1,17 @@
+<template>
+  <svg aria-hidden="true" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="4" y="4" width="56" height="56" rx="18" fill="url(#brand-bg)" />
+    <path d="M18 41.5V24.2c0-2.1 1.7-3.8 3.8-3.8h20.4c2.1 0 3.8 1.7 3.8 3.8v17.3" stroke="#082f49" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M24 41.5v-13h16v13" stroke="#082f49" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M14 43h36" stroke="#ecfeff" stroke-width="5" stroke-linecap="round" />
+    <path d="M20 49h24" stroke="#ecfeff" stroke-width="5" stroke-linecap="round" />
+    <circle cx="47" cy="18" r="4" fill="#ecfeff" />
+    <defs>
+      <linearGradient id="brand-bg" x1="8" y1="8" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#67e8f9" />
+        <stop offset="0.52" stop-color="#22d3ee" />
+        <stop offset="1" stop-color="#0f766e" />
+      </linearGradient>
+    </defs>
+  </svg>
+</template>
