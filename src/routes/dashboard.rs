@@ -77,5 +77,7 @@ pub async fn summary(
         frps_bind_port: frps.bind_port,
         remote_port_min: frps.remote_port_min,
         remote_port_max: frps.remote_port_max,
+        vhost_http_port: frps.vhost_http_port,
+        vhost_https_port: frps.vhost_https_port,
     }))
 }

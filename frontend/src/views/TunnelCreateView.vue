@@ -3,8 +3,9 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { listCertificates } from '../api/certificates'
+import { getDashboardSummary } from '../api/dashboard'
 import { createTunnel, getTunnel, updateTunnel } from '../api/tunnels'
-import type { CertificateInfo } from '../api/types'
+import type { CertificateInfo, DashboardSummary } from '../api/types'
 import FormField from '../components/FormField.vue'
 import PageHeader from '../components/PageHeader.vue'
 import SelectField from '../components/SelectField.vue'
@@ -25,6 +26,7 @@ const customDomain = ref('')
 const tlsMode = ref('https_passthrough')
 const certificateId = ref<string | null>(null)
 const certificates = ref<CertificateInfo[]>([])
+const summary = ref<DashboardSummary | null>(null)
 const error = ref('')
 const loading = ref(false)
 const loadingTunnel = ref(false)
@@ -51,6 +53,12 @@ const entryLabel = computed(() => {
   if (protocol.value === 'http') return '通过 HTTP vhost 域名访问本地服务'
   return tlsMode.value === 'uploaded_cert' ? 'frpc 使用上传证书提供 HTTPS 入口' : 'TLS 透传到本地服务'
 })
+const activeVhostPort = computed(() => (protocol.value === 'http' ? summary.value?.vhost_http_port : summary.value?.vhost_https_port))
+const vhostEnabled = computed(() => !isDomainTunnel.value || Boolean(activeVhostPort.value))
+const vhostStatusLabel = computed(() => {
+  if (!isDomainTunnel.value) return ''
+  return activeVhostPort.value ? `${protocol.value.toUpperCase()} 域名入口已启用：${activeVhostPort.value}` : `${protocol.value.toUpperCase()} 域名入口未启用`
+})
 
 async function loadTunnel() {
   if (!tunnelId.value) return
@@ -75,6 +83,10 @@ async function loadTunnel() {
 
 async function submit() {
   if (!localPort.value) return
+  if (!vhostEnabled.value) {
+    error.value = `${protocol.value.toUpperCase()} 域名入口未启用，请联系管理员配置 frps vhost 端口`
+    return
+  }
   error.value = ''
   loading.value = true
   try {
@@ -103,7 +115,9 @@ async function submit() {
 
 onMounted(async () => {
   try {
-    certificates.value = await listCertificates()
+    const [certificateList, dashboardSummary] = await Promise.all([listCertificates(), getDashboardSummary()])
+    certificates.value = certificateList
+    summary.value = dashboardSummary
   } catch {
     certificates.value = []
   }
@@ -163,12 +177,13 @@ onMounted(async () => {
       <div v-if="protocol === 'https' && tlsMode === 'uploaded_cert' && certificates.length === 0" class="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
         还没有可用证书。先到证书页上传证书和私钥，再回来选择。
       </div>
-      <div v-if="isDomainTunnel" class="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
-        域名需要解析到 frps 服务器。HTTPS 上传证书模式会生成包含证书和私钥的 frpc.zip。
+      <div v-if="isDomainTunnel" :class="vhostEnabled ? 'rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100' : 'rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100'">
+        <div class="font-semibold">{{ vhostStatusLabel }}</div>
+        <div class="mt-1">域名需要解析到 frps 服务器。HTTPS 上传证书模式会生成包含证书和私钥的 frpc.zip。</div>
       </div>
       <p v-if="error" class="rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{{ error }}</p>
       <div class="sticky bottom-4 z-20 flex flex-wrap gap-3 rounded-3xl border border-white/10 bg-slate-950/80 p-3 shadow-2xl shadow-slate-950/60 backdrop-blur-xl">
-        <button class="btn-primary" :disabled="loading || loadingTunnel" type="submit">{{ loading ? '保存中' : isEdit ? '保存修改' : '创建' }}</button>
+        <button class="btn-primary" :disabled="loading || loadingTunnel || !vhostEnabled" type="submit">{{ loading ? '保存中' : isEdit ? '保存修改' : '创建' }}</button>
         <RouterLink class="btn-secondary" role="button" to="/dashboard">返回</RouterLink>
       </div>
     </form>

@@ -182,4 +182,6 @@ export interface DashboardSummary {
   frps_bind_port: number
   remote_port_min: number
   remote_port_max: number
+  vhost_http_port: number | null
+  vhost_https_port: number | null
 }

@@ -252,6 +252,8 @@ pub struct DashboardSummaryResponse {
     pub frps_bind_port: u16,
     pub remote_port_min: i32,
     pub remote_port_max: i32,
+    pub vhost_http_port: Option<u16>,
+    pub vhost_https_port: Option<u16>,
 }
 
 impl From<&Config> for ConfigResponse {
