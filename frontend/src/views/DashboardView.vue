@@ -41,6 +41,17 @@ function entryValue(row: TunnelWithTraffic) {
   return '未配置入口'
 }
 
+function advancedItems(row: TunnelWithTraffic) {
+  const items: string[] = []
+  if (row.tunnel.use_encryption) items.push('加密')
+  if (row.tunnel.use_compression) items.push('压缩')
+  if (row.tunnel.bandwidth_limit) items.push(`限速 ${row.tunnel.bandwidth_limit}${row.tunnel.bandwidth_limit_mode ? ` · ${row.tunnel.bandwidth_limit_mode}` : ''}`)
+  if (row.tunnel.proxy_protocol_version) items.push(`Proxy Protocol ${row.tunnel.proxy_protocol_version}`)
+  if (row.tunnel.locations) items.push(`路径 ${row.tunnel.locations.split(',').length}`)
+  if (row.tunnel.host_header_rewrite) items.push(`Host ${row.tunnel.host_header_rewrite}`)
+  return items
+}
+
 function statusTone(status: string): 'default' | 'success' | 'danger' {
   if (status === 'online' || status === 'running') return 'success'
   if (status === 'offline') return 'danger'
@@ -151,6 +162,9 @@ onMounted(load)
                 <code class="break-all text-cyan-100">{{ entryValue(row) }}</code>
                 <span>本地 {{ row.tunnel.local_host }}:{{ row.tunnel.local_port }}</span>
                 <span v-if="row.matched_proxy_name" class="text-xs text-slate-500">frps proxy：{{ row.matched_proxy_name }}</span>
+                <div v-if="advancedItems(row).length" class="mt-2 flex flex-wrap gap-2">
+                  <span v-for="item in advancedItems(row)" :key="item" class="rounded-full border border-cyan-300/15 bg-cyan-300/[0.06] px-2.5 py-1 text-xs font-semibold text-cyan-100">{{ item }}</span>
+                </div>
               </div>
             </div>
             <div class="flex flex-wrap gap-2">

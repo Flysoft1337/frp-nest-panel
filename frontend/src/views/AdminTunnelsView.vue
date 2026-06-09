@@ -59,6 +59,17 @@ function customDomains(value: string | null) {
   return value?.split(',').map((domain) => domain.trim()).filter(Boolean) || []
 }
 
+function advancedItems(row: AdminTunnelRow) {
+  const items: string[] = []
+  if (row.tunnel.use_encryption) items.push('加密')
+  if (row.tunnel.use_compression) items.push('压缩')
+  if (row.tunnel.bandwidth_limit) items.push(`限速 ${row.tunnel.bandwidth_limit}${row.tunnel.bandwidth_limit_mode ? ` · ${row.tunnel.bandwidth_limit_mode}` : ''}`)
+  if (row.tunnel.proxy_protocol_version) items.push(`Proxy Protocol ${row.tunnel.proxy_protocol_version}`)
+  if (row.tunnel.locations) items.push(`路径 ${row.tunnel.locations.split(',').length}`)
+  if (row.tunnel.host_header_rewrite) items.push(`Host ${row.tunnel.host_header_rewrite}`)
+  return items
+}
+
 async function load() {
   loading.value = true
   try {
@@ -170,6 +181,9 @@ onMounted(async () => {
                 <span>用户 <strong class="text-slate-200">{{ row.username }}</strong></span>
                 <span>{{ trafficRow(row.tunnel.id)?.current_connections || 0 }} 连接</span>
                 <span v-if="trafficRow(row.tunnel.id)?.matched_proxy_name">proxy {{ trafficRow(row.tunnel.id)?.matched_proxy_name }}</span>
+              </div>
+              <div v-if="advancedItems(row).length" class="mt-3 flex flex-wrap gap-2">
+                <span v-for="item in advancedItems(row)" :key="item" class="rounded-full border border-cyan-300/15 bg-cyan-300/[0.06] px-2.5 py-1 text-xs font-semibold text-cyan-100">{{ item }}</span>
               </div>
             </div>
             <div class="flex flex-wrap gap-2">

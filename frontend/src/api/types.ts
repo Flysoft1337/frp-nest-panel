@@ -22,6 +22,13 @@ export interface Tunnel {
   custom_domain: string | null
   tls_mode: string | null
   certificate_id: string | null
+  use_encryption: boolean
+  use_compression: boolean
+  bandwidth_limit: string | null
+  bandwidth_limit_mode: string | null
+  proxy_protocol_version: string | null
+  locations: string | null
+  host_header_rewrite: string | null
   created_at: string
 }
 

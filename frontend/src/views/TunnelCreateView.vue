@@ -26,6 +26,13 @@ const remotePort = ref<number | null>(null)
 const customDomain = ref('')
 const tlsMode = ref('https_passthrough')
 const certificateId = ref<string | null>(null)
+const useEncryption = ref(false)
+const useCompression = ref(false)
+const bandwidthLimit = ref('')
+const bandwidthLimitMode = ref('client')
+const proxyProtocolVersion = ref('')
+const locations = ref('')
+const hostHeaderRewrite = ref('')
 const certificates = ref<CertificateInfo[]>([])
 const summary = ref<DashboardSummary | null>(null)
 const error = ref('')
@@ -40,6 +47,19 @@ const protocolOptions = [
 const tlsModeOptions = [
   { label: 'HTTPS 透传，本地服务自己处理 TLS', value: 'https_passthrough' },
   { label: '上传证书，转发到本地 HTTP', value: 'uploaded_cert' },
+]
+const booleanOptions = [
+  { label: '关闭', value: false },
+  { label: '启用', value: true },
+]
+const bandwidthModeOptions = [
+  { label: '客户端限速', value: 'client' },
+  { label: '服务端限速', value: 'server' },
+]
+const proxyProtocolOptions = [
+  { label: '关闭', value: '' },
+  { label: 'v1', value: 'v1' },
+  { label: 'v2', value: 'v2' },
 ]
 const certificateOptions = computed(() => [
   { label: '选择证书', value: null, disabled: true },
@@ -73,6 +93,16 @@ const entryPreview = computed(() => {
   if (domains.length === 0) return '填写绑定域名后显示入口预览'
   return domains.map((domain) => `${protocol.value}://${domain}`).join(' · ')
 })
+const advancedSummary = computed(() => {
+  const items: string[] = []
+  if (useEncryption.value) items.push('加密')
+  if (useCompression.value) items.push('压缩')
+  if (bandwidthLimit.value.trim()) items.push(`限速 ${bandwidthLimit.value.trim()} · ${bandwidthLimitMode.value}`)
+  if (isPortTunnel.value && proxyProtocolVersion.value) items.push(`Proxy Protocol ${proxyProtocolVersion.value}`)
+  if (isDomainTunnel.value && locations.value.trim()) items.push('路径匹配')
+  if (isDomainTunnel.value && hostHeaderRewrite.value.trim()) items.push('Host Rewrite')
+  return items.length > 0 ? items.join(' · ') : '未启用高级配置'
+})
 const protocolCards = computed(() => protocolOptions.map((option) => ({
   ...option,
   description: option.value === 'tcp'
@@ -98,6 +128,13 @@ async function loadTunnel() {
     customDomain.value = tunnel.custom_domain ?? ''
     tlsMode.value = tunnel.tls_mode ?? 'https_passthrough'
     certificateId.value = tunnel.certificate_id
+    useEncryption.value = tunnel.use_encryption
+    useCompression.value = tunnel.use_compression
+    bandwidthLimit.value = tunnel.bandwidth_limit ?? ''
+    bandwidthLimitMode.value = tunnel.bandwidth_limit_mode ?? 'client'
+    proxyProtocolVersion.value = tunnel.proxy_protocol_version ?? ''
+    locations.value = tunnel.locations ?? ''
+    hostHeaderRewrite.value = tunnel.host_header_rewrite ?? ''
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载失败'
   } finally {
@@ -123,6 +160,13 @@ async function submit() {
       custom_domain: isDomainTunnel.value ? customDomain.value : null,
       tls_mode: protocol.value === 'https' ? tlsMode.value : null,
       certificate_id: protocol.value === 'https' && tlsMode.value === 'uploaded_cert' ? certificateId.value : null,
+      use_encryption: useEncryption.value,
+      use_compression: useCompression.value,
+      bandwidth_limit: bandwidthLimit.value.trim() || null,
+      bandwidth_limit_mode: bandwidthLimit.value.trim() ? bandwidthLimitMode.value : null,
+      proxy_protocol_version: isPortTunnel.value ? proxyProtocolVersion.value || null : null,
+      locations: isDomainTunnel.value ? locations.value : null,
+      host_header_rewrite: isDomainTunnel.value ? hostHeaderRewrite.value.trim() || null : null,
     }
     if (tunnelId.value) {
       await updateTunnel(tunnelId.value, input)
@@ -212,6 +256,36 @@ onMounted(async () => {
           <FormField v-if="protocol === 'https' && tlsMode === 'uploaded_cert'" label="证书"><SelectField v-model="certificateId" :options="certificateOptions" /></FormField>
         </div>
       </section>
+
+      <details class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+        <summary class="cursor-pointer list-none">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 class="text-lg font-bold text-white">高级 frp 配置</h2>
+              <p class="mt-1 text-sm text-slate-400">{{ advancedSummary }}</p>
+            </div>
+            <span class="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold text-cyan-100">展开配置</span>
+          </div>
+        </summary>
+        <div class="mt-5 grid gap-5">
+          <div class="grid gap-5 md:grid-cols-2">
+            <FormField label="启用加密"><SelectField v-model="useEncryption" :options="booleanOptions" /></FormField>
+            <FormField label="启用压缩"><SelectField v-model="useCompression" :options="booleanOptions" /></FormField>
+            <FormField label="带宽限制" note="例如 1MB、500KB；留空关闭"><input v-model="bandwidthLimit" placeholder="1MB" /></FormField>
+            <FormField label="限速位置"><SelectField v-model="bandwidthLimitMode" :options="bandwidthModeOptions" /></FormField>
+          </div>
+          <div v-if="isPortTunnel" class="grid gap-5 md:grid-cols-2">
+            <FormField label="Proxy Protocol"><SelectField v-model="proxyProtocolVersion" :options="proxyProtocolOptions" /></FormField>
+            <div class="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-400">
+              只在后端服务需要接收真实来源地址时启用。目标服务必须支持对应版本。
+            </div>
+          </div>
+          <div v-if="isDomainTunnel" class="grid gap-5 md:grid-cols-2">
+            <FormField label="路径匹配" note="每行一个路径，必须以 / 开头"><textarea v-model="locations" rows="4" placeholder="/api&#10;/assets" /></FormField>
+            <FormField label="Host Header Rewrite" note="留空表示保留原 Host"><input v-model="hostHeaderRewrite" placeholder="internal.example.com" /></FormField>
+          </div>
+        </div>
+      </details>
 
       <div v-if="protocol === 'https' && tlsMode === 'uploaded_cert' && certificates.length === 0" class="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
         还没有可用证书。先到证书页上传证书和私钥，再回来选择。

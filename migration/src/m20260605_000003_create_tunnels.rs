@@ -78,5 +78,12 @@ pub enum Tunnels {
     CustomDomain,
     TlsMode,
     CertificateId,
+    UseEncryption,
+    UseCompression,
+    BandwidthLimit,
+    BandwidthLimitMode,
+    ProxyProtocolVersion,
+    Locations,
+    HostHeaderRewrite,
     CreatedAt,
 }

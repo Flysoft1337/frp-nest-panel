@@ -52,6 +52,13 @@ pub struct TunnelResponse {
     pub custom_domain: Option<String>,
     pub tls_mode: Option<String>,
     pub certificate_id: Option<Uuid>,
+    pub use_encryption: bool,
+    pub use_compression: bool,
+    pub bandwidth_limit: Option<String>,
+    pub bandwidth_limit_mode: Option<String>,
+    pub proxy_protocol_version: Option<String>,
+    pub locations: Option<String>,
+    pub host_header_rewrite: Option<String>,
     pub created_at: DateTime<FixedOffset>,
 }
 
@@ -95,6 +102,13 @@ impl From<tunnels::Model> for TunnelResponse {
             custom_domain: tunnel.custom_domain,
             tls_mode: tunnel.tls_mode,
             certificate_id: tunnel.certificate_id,
+            use_encryption: tunnel.use_encryption,
+            use_compression: tunnel.use_compression,
+            bandwidth_limit: tunnel.bandwidth_limit,
+            bandwidth_limit_mode: tunnel.bandwidth_limit_mode,
+            proxy_protocol_version: tunnel.proxy_protocol_version,
+            locations: tunnel.locations,
+            host_header_rewrite: tunnel.host_header_rewrite,
             created_at: tunnel.created_at,
         }
     }

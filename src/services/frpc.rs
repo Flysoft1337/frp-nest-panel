@@ -35,6 +35,23 @@ struct FrpcTomlProxy<'a> {
     remote_port: Option<i32>,
     #[serde(rename = "customDomains", skip_serializing_if = "Option::is_none")]
     custom_domains: Option<Vec<&'a str>>,
+    #[serde(rename = "useEncryption", skip_serializing_if = "is_false")]
+    use_encryption: bool,
+    #[serde(rename = "useCompression", skip_serializing_if = "is_false")]
+    use_compression: bool,
+    #[serde(rename = "bandwidthLimit", skip_serializing_if = "Option::is_none")]
+    bandwidth_limit: Option<&'a str>,
+    #[serde(rename = "bandwidthLimitMode", skip_serializing_if = "Option::is_none")]
+    bandwidth_limit_mode: Option<&'a str>,
+    #[serde(
+        rename = "proxyProtocolVersion",
+        skip_serializing_if = "Option::is_none"
+    )]
+    proxy_protocol_version: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    locations: Option<Vec<&'a str>>,
+    #[serde(rename = "hostHeaderRewrite", skip_serializing_if = "Option::is_none")]
+    host_header_rewrite: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     plugin: Option<FrpcTomlPlugin>,
 }
@@ -81,15 +98,7 @@ pub fn render_frpc_toml(
             }),
         ),
         "https" => domain_proxy(tunnel, None),
-        _ => FrpcTomlProxy {
-            name: &tunnel.name,
-            protocol: &tunnel.protocol,
-            local_ip: Some(&tunnel.local_host),
-            local_port: Some(tunnel.local_port),
-            remote_port: tunnel.remote_port,
-            custom_domains: None,
-            plugin: None,
-        },
+        _ => port_proxy(tunnel),
     };
 
     toml::to_string_pretty(&FrpcToml {
@@ -105,12 +114,43 @@ pub fn render_frpc_toml(
     .unwrap_or_default()
 }
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 fn custom_domains(value: &str) -> Vec<&str> {
     value
         .split(',')
         .map(str::trim)
         .filter(|domain| !domain.is_empty())
         .collect()
+}
+
+fn locations(value: &str) -> Vec<&str> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|location| !location.is_empty())
+        .collect()
+}
+
+fn port_proxy(tunnel: &tunnels::Model) -> FrpcTomlProxy<'_> {
+    FrpcTomlProxy {
+        name: &tunnel.name,
+        protocol: &tunnel.protocol,
+        local_ip: Some(&tunnel.local_host),
+        local_port: Some(tunnel.local_port),
+        remote_port: tunnel.remote_port,
+        custom_domains: None,
+        use_encryption: tunnel.use_encryption,
+        use_compression: tunnel.use_compression,
+        bandwidth_limit: tunnel.bandwidth_limit.as_deref(),
+        bandwidth_limit_mode: tunnel.bandwidth_limit_mode.as_deref(),
+        proxy_protocol_version: tunnel.proxy_protocol_version.as_deref(),
+        locations: None,
+        host_header_rewrite: None,
+        plugin: None,
+    }
 }
 
 fn domain_proxy<'a>(
@@ -125,6 +165,13 @@ fn domain_proxy<'a>(
         local_port: (!uploaded_cert).then_some(tunnel.local_port),
         remote_port: None,
         custom_domains: tunnel.custom_domain.as_deref().map(custom_domains),
+        use_encryption: tunnel.use_encryption,
+        use_compression: tunnel.use_compression,
+        bandwidth_limit: tunnel.bandwidth_limit.as_deref(),
+        bandwidth_limit_mode: tunnel.bandwidth_limit_mode.as_deref(),
+        proxy_protocol_version: None,
+        locations: tunnel.locations.as_deref().map(locations),
+        host_header_rewrite: tunnel.host_header_rewrite.as_deref(),
         plugin,
     }
 }

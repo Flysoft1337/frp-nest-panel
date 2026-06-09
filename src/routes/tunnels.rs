@@ -35,6 +35,15 @@ pub struct TunnelForm {
     custom_domain: Option<String>,
     tls_mode: Option<String>,
     certificate_id: Option<Uuid>,
+    #[serde(default)]
+    use_encryption: bool,
+    #[serde(default)]
+    use_compression: bool,
+    bandwidth_limit: Option<String>,
+    bandwidth_limit_mode: Option<String>,
+    proxy_protocol_version: Option<String>,
+    locations: Option<String>,
+    host_header_rewrite: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -134,6 +143,13 @@ pub async fn update(
     active.custom_domain = Set(input.custom_domain);
     active.tls_mode = Set(input.tls_mode);
     active.certificate_id = Set(input.certificate_id);
+    active.use_encryption = Set(input.use_encryption);
+    active.use_compression = Set(input.use_compression);
+    active.bandwidth_limit = Set(input.bandwidth_limit);
+    active.bandwidth_limit_mode = Set(input.bandwidth_limit_mode);
+    active.proxy_protocol_version = Set(input.proxy_protocol_version);
+    active.locations = Set(input.locations);
+    active.host_header_rewrite = Set(input.host_header_rewrite);
     let tunnel = active.update(&state.db).await?;
 
     Ok(Json(TunnelResponse::from(tunnel)))
@@ -266,6 +282,13 @@ struct ValidTunnelInput {
     custom_domain: Option<String>,
     tls_mode: Option<String>,
     certificate_id: Option<Uuid>,
+    use_encryption: bool,
+    use_compression: bool,
+    bandwidth_limit: Option<String>,
+    bandwidth_limit_mode: Option<String>,
+    proxy_protocol_version: Option<String>,
+    locations: Option<String>,
+    host_header_rewrite: Option<String>,
 }
 
 async fn validate_tunnel_form(
@@ -293,6 +316,16 @@ async fn validate_tunnel_form(
         .map(|value| value.trim().to_owned())
         .filter(|value| !value.is_empty());
     let mut certificate_id = form.certificate_id;
+    let bandwidth_limit = normalize_bandwidth_limit(form.bandwidth_limit.as_deref())?;
+    let bandwidth_limit_mode = if bandwidth_limit.is_some() {
+        normalize_bandwidth_limit_mode(form.bandwidth_limit_mode.as_deref())?
+    } else {
+        None
+    };
+    let proxy_protocol_version =
+        normalize_proxy_protocol_version(form.proxy_protocol_version.as_deref())?;
+    let locations = normalize_locations(form.locations.as_deref())?;
+    let host_header_rewrite = normalize_host_header_rewrite(form.host_header_rewrite.as_deref())?;
 
     match protocol.as_str() {
         "tcp" | "udp" => {
@@ -301,11 +334,21 @@ async fn validate_tunnel_form(
                     "TCP/UDP 隧道不能绑定域名或证书".to_owned(),
                 ));
             }
+            if locations.is_some() || host_header_rewrite.is_some() {
+                return Err(AppError::BadRequest(
+                    "TCP/UDP 隧道不能设置 HTTP 路径或 Host Header Rewrite".to_owned(),
+                ));
+            }
         }
         "http" => {
             if form.remote_port.is_some() || tls_mode.is_some() || certificate_id.is_some() {
                 return Err(AppError::BadRequest(
                     "HTTP 隧道不能设置远程端口或证书".to_owned(),
+                ));
+            }
+            if proxy_protocol_version.is_some() {
+                return Err(AppError::BadRequest(
+                    "HTTP 隧道不能设置 Proxy Protocol".to_owned(),
                 ));
             }
             if custom_domain.is_none() {
@@ -321,6 +364,11 @@ async fn validate_tunnel_form(
             if form.remote_port.is_some() {
                 return Err(AppError::BadRequest(
                     "HTTPS 隧道不能设置远程端口".to_owned(),
+                ));
+            }
+            if proxy_protocol_version.is_some() {
+                return Err(AppError::BadRequest(
+                    "HTTPS 隧道不能设置 Proxy Protocol".to_owned(),
                 ));
             }
             if custom_domains.is_empty() {
@@ -365,6 +413,13 @@ async fn validate_tunnel_form(
         custom_domain,
         tls_mode,
         certificate_id,
+        use_encryption: form.use_encryption,
+        use_compression: form.use_compression,
+        bandwidth_limit,
+        bandwidth_limit_mode,
+        proxy_protocol_version,
+        locations,
+        host_header_rewrite,
     })
 }
 
@@ -387,6 +442,56 @@ fn normalize_custom_domains(value: Option<&str>) -> AppResult<Vec<String>> {
         return Err(AppError::BadRequest("最多绑定 8 个域名".to_owned()));
     }
     Ok(domains)
+}
+
+fn normalize_bandwidth_limit(value: Option<&str>) -> AppResult<Option<String>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let value = validation::bandwidth_limit(value)?;
+    Ok((!value.is_empty()).then_some(value))
+}
+
+fn normalize_bandwidth_limit_mode(value: Option<&str>) -> AppResult<Option<String>> {
+    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(Some("client".to_owned()));
+    };
+    validation::bandwidth_limit_mode(value).map(Some)
+}
+
+fn normalize_proxy_protocol_version(value: Option<&str>) -> AppResult<Option<String>> {
+    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    validation::proxy_protocol_version(value).map(Some)
+}
+
+fn normalize_locations(value: Option<&str>) -> AppResult<Option<String>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let mut locations = Vec::new();
+    for location in value.split([',', '\n']) {
+        let location = location.trim();
+        if location.is_empty() {
+            continue;
+        }
+        let location = validation::http_location(location)?;
+        if !locations.contains(&location) {
+            locations.push(location);
+        }
+    }
+    if locations.len() > 16 {
+        return Err(AppError::BadRequest("最多设置 16 条路径匹配".to_owned()));
+    }
+    Ok((!locations.is_empty()).then_some(locations.join(",")))
+}
+
+fn normalize_host_header_rewrite(value: Option<&str>) -> AppResult<Option<String>> {
+    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    validation::host_header(value).map(Some)
 }
 
 async fn update_remote_port(
@@ -434,6 +539,13 @@ async fn insert_tunnel(
         custom_domain: Set(input.custom_domain.clone()),
         tls_mode: Set(input.tls_mode.clone()),
         certificate_id: Set(input.certificate_id),
+        use_encryption: Set(input.use_encryption),
+        use_compression: Set(input.use_compression),
+        bandwidth_limit: Set(input.bandwidth_limit.clone()),
+        bandwidth_limit_mode: Set(input.bandwidth_limit_mode.clone()),
+        proxy_protocol_version: Set(input.proxy_protocol_version.clone()),
+        locations: Set(input.locations.clone()),
+        host_header_rewrite: Set(input.host_header_rewrite.clone()),
         created_at: Set(Utc::now().fixed_offset()),
     }
     .insert(&state.db)

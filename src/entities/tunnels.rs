@@ -15,6 +15,13 @@ pub struct Model {
     pub custom_domain: Option<String>,
     pub tls_mode: Option<String>,
     pub certificate_id: Option<Uuid>,
+    pub use_encryption: bool,
+    pub use_compression: bool,
+    pub bandwidth_limit: Option<String>,
+    pub bandwidth_limit_mode: Option<String>,
+    pub proxy_protocol_version: Option<String>,
+    pub locations: Option<String>,
+    pub host_header_rewrite: Option<String>,
     pub created_at: DateTimeWithTimeZone,
 }
 
