@@ -39,10 +39,10 @@ const error = ref('')
 const loading = ref(false)
 const loadingTunnel = ref(false)
 const protocolOptions = [
-  { label: 'TCP', value: 'tcp' },
-  { label: 'UDP', value: 'udp' },
-  { label: 'HTTP 域名', value: 'http' },
-  { label: 'HTTPS 域名', value: 'https' },
+  { label: 'TCP', value: 'tcp', title: 'TCP 端口' },
+  { label: 'UDP', value: 'udp', title: 'UDP 端口' },
+  { label: 'HTTP 域名', value: 'http', title: 'HTTP 域名' },
+  { label: 'HTTPS 域名', value: 'https', title: 'HTTPS 域名' },
 ]
 const tlsModeOptions = [
   { label: 'HTTPS 透传，本地服务自己处理 TLS', value: 'https_passthrough' },
@@ -106,12 +106,12 @@ const advancedSummary = computed(() => {
 const protocolCards = computed(() => protocolOptions.map((option) => ({
   ...option,
   description: option.value === 'tcp'
-    ? '开放一个远程 TCP 端口。'
+    ? '开放远程 TCP 入口。'
     : option.value === 'udp'
-      ? '开放一个远程 UDP 端口。'
+      ? '开放远程 UDP 入口。'
       : option.value === 'http'
-        ? '用 HTTP 域名访问本地服务。'
-        : '用 HTTPS 域名访问本地服务。',
+        ? '通过域名转发 HTTP。'
+        : '通过域名转发 HTTPS。',
 })))
 
 async function loadTunnel() {
@@ -199,39 +199,34 @@ onMounted(async () => {
     :title="isEdit ? '编辑隧道' : '创建隧道'"
     :description="isEdit ? '修改隧道名称、协议、本地服务和远端入口。' : '先选择协议，再填写本地服务和远端入口。'"
   />
-  <section class="card max-w-3xl p-6">
+  <section class="card mx-auto w-full max-w-6xl p-6">
     <p v-if="loadingTunnel" class="mb-4 text-sm text-slate-400">加载中</p>
-    <form class="grid gap-5" @submit.prevent="submit">
-      <div class="grid gap-3 md:grid-cols-4">
-        <button
-          v-for="item in protocolCards"
-          :key="item.value"
-          class="rounded-3xl border p-4 text-left transition"
-          :class="protocol === item.value ? 'border-cyan-300/40 bg-cyan-300/[0.08]' : 'border-white/10 bg-white/[0.03] hover:border-cyan-300/20'"
-          type="button"
-          @click="protocol = item.value"
-        >
-          <div class="font-black text-white">{{ item.label }}</div>
-          <div class="mt-2 text-sm text-slate-400">{{ item.description }}</div>
-        </button>
-      </div>
-
-      <div class="rounded-3xl border border-cyan-300/20 bg-cyan-300/[0.06] p-4">
-        <div class="text-xs font-bold uppercase tracking-[0.2em] text-cyan-100/80">{{ protocolLabel }} 入口预览</div>
-        <code class="mt-2 block break-all text-sm text-cyan-50">{{ entryPreview }}</code>
-        <div class="mt-2 text-sm text-slate-300">{{ entryLabel }}</div>
-      </div>
-
-      <section class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-        <div class="mb-4 flex flex-col gap-1">
-          <h2 class="text-lg font-bold text-white">基础信息</h2>
-          <p class="text-sm text-slate-400">名称只用于面板和 frpc 配置识别。</p>
+    <form class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start" @submit.prevent="submit">
+      <div class="grid gap-5">
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <button
+            v-for="item in protocolCards"
+            :key="item.value"
+            class="min-h-28 rounded-3xl border p-4 text-left transition"
+            :class="protocol === item.value ? 'border-cyan-300/40 bg-cyan-300/[0.08]' : 'border-white/10 bg-white/[0.03] hover:border-cyan-300/20'"
+            type="button"
+            @click="protocol = item.value"
+          >
+            <div class="text-base font-black text-white">{{ item.title }}</div>
+            <div class="mt-2 text-sm leading-6 text-slate-400">{{ item.description }}</div>
+          </button>
         </div>
-        <div class="grid gap-5 md:grid-cols-2">
-          <FormField label="隧道名称"><input v-model="name" placeholder="mc-server" required /></FormField>
-          <FormField label="当前协议"><input :value="protocolLabel" disabled /></FormField>
-        </div>
-      </section>
+
+        <section class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+          <div class="mb-4 flex flex-col gap-1">
+            <h2 class="text-lg font-bold text-white">基础信息</h2>
+            <p class="text-sm text-slate-400">名称只用于面板和 frpc 配置识别。</p>
+          </div>
+          <div class="grid gap-5 md:grid-cols-2">
+            <FormField label="隧道名称"><input v-model="name" placeholder="mc-server" required /></FormField>
+            <FormField label="当前协议"><input :value="protocolLabel" disabled /></FormField>
+          </div>
+        </section>
 
       <section class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
         <div class="mb-4 flex flex-col gap-1">
@@ -294,11 +289,30 @@ onMounted(async () => {
         <div class="font-semibold">{{ vhostStatusLabel }}</div>
         <div class="mt-1">每行一个域名，最多 8 个。域名需要解析到 frps 服务器。HTTPS 上传证书模式会生成包含证书和私钥的 frpc.zip。</div>
       </div>
-      <AlertBox v-if="error" :message="error" tone="danger" />
-      <div class="sticky bottom-4 z-20 flex flex-wrap gap-3 rounded-3xl border border-white/10 bg-slate-950/80 p-3 shadow-2xl shadow-slate-950/60 backdrop-blur-xl">
-        <button class="btn-primary" :disabled="loading || loadingTunnel || !vhostEnabled" type="submit">{{ loading ? '保存中' : isEdit ? '保存修改' : '创建' }}</button>
-        <RouterLink class="btn-secondary" role="button" to="/dashboard">返回</RouterLink>
+        <AlertBox v-if="error" :message="error" tone="danger" />
       </div>
+
+      <aside class="grid gap-4 xl:sticky xl:top-28">
+        <div class="rounded-3xl border border-cyan-300/20 bg-cyan-300/[0.06] p-5">
+          <div class="text-xs font-bold uppercase tracking-[0.2em] text-cyan-100/80">{{ protocolLabel }} 入口预览</div>
+          <code class="mt-3 block break-all rounded-2xl border border-cyan-300/10 bg-slate-950/40 px-3 py-2 text-sm text-cyan-50">{{ entryPreview }}</code>
+          <div class="mt-3 text-sm leading-6 text-slate-300">{{ entryLabel }}</div>
+        </div>
+
+        <div class="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+          <div class="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">当前选择</div>
+          <div class="mt-3 grid gap-2 text-sm text-slate-300">
+            <div class="flex items-center justify-between gap-3"><span>协议</span><strong class="text-white">{{ protocolLabel }}</strong></div>
+            <div class="flex items-center justify-between gap-3"><span>本地</span><code class="text-cyan-100">{{ localHost }}:{{ localPort || '-' }}</code></div>
+            <div class="flex items-center justify-between gap-3"><span>高级配置</span><span class="text-right text-slate-400">{{ advancedSummary }}</span></div>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap gap-3 rounded-3xl border border-white/10 bg-slate-950/80 p-3 shadow-2xl shadow-slate-950/60 backdrop-blur-xl">
+          <button class="btn-primary flex-1" :disabled="loading || loadingTunnel || !vhostEnabled" type="submit">{{ loading ? '保存中' : isEdit ? '保存修改' : '创建' }}</button>
+          <RouterLink class="btn-secondary" role="button" to="/dashboard">返回</RouterLink>
+        </div>
+      </aside>
     </form>
   </section>
 </template>
