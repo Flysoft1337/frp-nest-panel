@@ -61,10 +61,25 @@ pub struct TunnelWithTrafficResponse {
     pub traffic_available: bool,
     pub traffic_in: u64,
     pub traffic_out: u64,
+    pub runtime_status: String,
+    pub current_connections: u64,
+    pub matched_proxy_name: Option<String>,
     pub persistent_traffic_available: bool,
     pub persistent_traffic_in: u64,
     pub persistent_traffic_out: u64,
     pub last_sampled_at: Option<DateTime<FixedOffset>>,
+}
+
+#[derive(Serialize)]
+pub struct TrafficHistoryPointResponse {
+    pub traffic_in: u64,
+    pub traffic_out: u64,
+    pub sampled_at: DateTime<FixedOffset>,
+}
+
+#[derive(Serialize)]
+pub struct TrafficHistoryResponse {
+    pub points: Vec<TrafficHistoryPointResponse>,
 }
 
 impl From<tunnels::Model> for TunnelResponse {
@@ -191,6 +206,9 @@ pub struct AdminTunnelTrafficResponse {
     pub username: String,
     pub traffic_in: u64,
     pub traffic_out: u64,
+    pub runtime_status: String,
+    pub current_connections: u64,
+    pub matched_proxy_name: Option<String>,
     pub persistent_traffic_available: bool,
     pub persistent_traffic_in: u64,
     pub persistent_traffic_out: u64,

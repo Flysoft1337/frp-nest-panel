@@ -8,7 +8,7 @@ use crate::{
     entities::tunnels,
     error::AppResult,
     routes::types::{DashboardSummaryResponse, TunnelResponse, TunnelWithTrafficResponse},
-    services::frps,
+    services::{frpc, frps},
     state::AppState,
 };
 
@@ -31,32 +31,27 @@ pub async fn tunnels(
     let traffic = snapshot
         .proxies
         .into_iter()
-        .map(|proxy| {
-            (
-                (proxy.protocol, proxy.name),
-                (proxy.traffic_in, proxy.traffic_out),
-            )
-        })
+        .map(|proxy| (frpc::proxy_key(&proxy.protocol, &proxy.name), proxy))
         .collect::<HashMap<_, _>>();
     let tunnels = tunnels
         .into_iter()
         .map(|tunnel| {
-            let user_key = (
-                tunnel.protocol.clone(),
-                format!("{}.{}", user.username, tunnel.name),
-            );
-            let key = (tunnel.protocol.clone(), tunnel.name.clone());
-            let (traffic_in, traffic_out) = traffic
-                .get(&user_key)
-                .or_else(|| traffic.get(&key))
-                .copied()
-                .unwrap_or((0, 0));
+            let proxy = frpc::proxy_names(&user.username, &tunnel.name)
+                .into_iter()
+                .find_map(|name| traffic.get(&frpc::proxy_key(&tunnel.protocol, &name)));
+            let traffic_in = proxy.map(|item| item.traffic_in).unwrap_or(0);
+            let traffic_out = proxy.map(|item| item.traffic_out).unwrap_or(0);
             let persistent_traffic = persistent.get(&tunnel.id);
             TunnelWithTrafficResponse {
                 tunnel: TunnelResponse::from(tunnel),
                 traffic_available: snapshot.available,
                 traffic_in,
                 traffic_out,
+                runtime_status: proxy
+                    .map(|item| item.status.clone())
+                    .unwrap_or_else(|| "offline".to_owned()),
+                current_connections: proxy.map(|item| item.current_connections).unwrap_or(0),
+                matched_proxy_name: proxy.map(|item| item.name.clone()),
                 persistent_traffic_available: persistent_traffic.is_some(),
                 persistent_traffic_in: persistent_traffic.map(|item| item.traffic_in).unwrap_or(0),
                 persistent_traffic_out: persistent_traffic

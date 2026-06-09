@@ -12,6 +12,7 @@ import type {
   Invite,
   ListParams,
   PageResponse,
+  TrafficHistoryResponse,
   UserRow,
 } from './types'
 
@@ -88,6 +89,10 @@ export function deleteTunnel(id: string) {
 
 export function getAdminTunnelFrpc(id: string) {
   return api<FrpcResponse>(`/api/admin/tunnels/${id}/frpc`)
+}
+
+export function getAdminTunnelTrafficHistory(id: string, range = '24h') {
+  return api<TrafficHistoryResponse>(`/api/admin/tunnels/${id}/traffic-history?range=${encodeURIComponent(range)}`)
 }
 
 export function getFrps() {

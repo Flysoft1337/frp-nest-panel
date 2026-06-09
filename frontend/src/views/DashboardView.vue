@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 import { getDashboardSummary } from '../api/dashboard'
-import { deleteTunnel, listTunnels } from '../api/tunnels'
-import type { DashboardSummary, TunnelWithTraffic } from '../api/types'
+import { deleteTunnel, getTunnelTrafficHistory, listTunnels } from '../api/tunnels'
+import type { DashboardSummary, TrafficHistoryPoint, TunnelWithTraffic } from '../api/types'
 import ConfirmButton from '../components/ConfirmButton.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusPill from '../components/StatusPill.vue'
@@ -12,6 +12,11 @@ const tunnels = ref<TunnelWithTraffic[]>([])
 const summary = ref<DashboardSummary | null>(null)
 const loading = ref(true)
 const error = ref('')
+const historyTunnelId = ref<string | null>(null)
+const historyLoading = ref(false)
+const historyError = ref('')
+const historyPoints = ref<TrafficHistoryPoint[]>([])
+const onlineCount = computed(() => tunnels.value.filter((row) => row.runtime_status !== 'offline').length)
 
 function formatBytes(value: number) {
   if (value < 1024) return `${value} B`
@@ -27,6 +32,45 @@ function customDomains(value: string | null) {
 function formatDateTime(value: string | null) {
   if (!value) return ''
   return new Date(value).toLocaleString()
+}
+
+function entryValue(row: TunnelWithTraffic) {
+  if (row.tunnel.remote_port && summary.value) return `${summary.value.frps_server_addr}:${row.tunnel.remote_port}`
+  const domains = customDomains(row.tunnel.custom_domain)
+  if (domains.length > 0) return domains.map((domain) => `${row.tunnel.protocol}://${domain}`).join(' · ')
+  return '未配置入口'
+}
+
+function statusTone(status: string): 'default' | 'success' | 'danger' {
+  if (status === 'online' || status === 'running') return 'success'
+  if (status === 'offline') return 'danger'
+  return 'default'
+}
+
+function statusText(status: string) {
+  if (status === 'online' || status === 'running') return '在线'
+  if (status === 'offline') return '离线'
+  return '未知'
+}
+
+async function toggleHistory(id: string) {
+  if (historyTunnelId.value === id) {
+    historyTunnelId.value = null
+    historyPoints.value = []
+    historyError.value = ''
+    return
+  }
+  historyTunnelId.value = id
+  historyLoading.value = true
+  historyError.value = ''
+  historyPoints.value = []
+  try {
+    historyPoints.value = (await getTunnelTrafficHistory(id)).points
+  } catch (err) {
+    historyError.value = err instanceof Error ? err.message : '历史流量加载失败'
+  } finally {
+    historyLoading.value = false
+  }
 }
 
 async function load() {
@@ -81,9 +125,10 @@ onMounted(load)
   <section class="card p-6">
     <div class="mb-5 flex flex-wrap items-center gap-3">
       <span class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300">{{ tunnels.length }} 个隧道</span>
+      <span class="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-100">{{ onlineCount }} 个在线</span>
       <span v-if="loading" class="text-sm text-slate-500">加载中</span>
       <span v-if="summary?.remaining_tunnels === 0" class="rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-2 text-sm text-amber-100">隧道数量已达上限</span>
-      <span v-if="error" class="text-sm text-red-200">{{ error }}</span>
+      <span v-if="error" class="rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-2 text-sm text-red-100">{{ error }}</span>
     </div>
 
     <div v-if="!loading && tunnels.length === 0" class="empty-state">
@@ -92,44 +137,63 @@ onMounted(load)
       <RouterLink class="btn-primary mt-6" role="button" to="/tunnels/new">创建第一个隧道</RouterLink>
     </div>
 
-    <div v-else class="grid gap-3">
+    <div v-else class="grid gap-4">
       <article v-for="row in tunnels" :key="row.tunnel.id" class="rounded-3xl border border-white/10 bg-white/[0.04] p-4 transition hover:border-cyan-300/20 hover:bg-white/[0.06]">
         <div class="grid gap-4">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2">
                 <h2 class="truncate text-lg font-black text-white">{{ row.tunnel.name }}</h2>
-                <StatusPill>{{ row.tunnel.protocol }}</StatusPill>
+                <StatusPill tone="default">{{ row.tunnel.protocol.toUpperCase() }}</StatusPill>
+                <StatusPill :tone="statusTone(row.runtime_status)">{{ statusText(row.runtime_status) }}</StatusPill>
               </div>
               <div class="mt-2 grid gap-1 text-sm text-slate-400">
-                <code v-if="row.persistent_traffic_available" class="text-cyan-100">长期 ↓ {{ formatBytes(row.persistent_traffic_in) }} / ↑ {{ formatBytes(row.persistent_traffic_out) }}</code>
-                <span v-else>长期统计等待采样</span>
-                <span v-if="row.last_sampled_at" class="text-xs text-slate-500">最近采样 {{ formatDateTime(row.last_sampled_at) }}</span>
-                <code v-if="row.traffic_available" class="text-slate-300">实时 ↓ {{ formatBytes(row.traffic_in) }} / ↑ {{ formatBytes(row.traffic_out) }}</code>
-                <span v-else class="text-xs text-slate-500">实时数据源未接入</span>
+                <code class="break-all text-cyan-100">{{ entryValue(row) }}</code>
+                <span>本地 {{ row.tunnel.local_host }}:{{ row.tunnel.local_port }}</span>
+                <span v-if="row.matched_proxy_name" class="text-xs text-slate-500">frps proxy：{{ row.matched_proxy_name }}</span>
               </div>
             </div>
             <div class="flex flex-wrap gap-2">
               <RouterLink class="btn-secondary" role="button" :to="`/tunnels/${row.tunnel.id}/edit`">编辑</RouterLink>
-              <RouterLink class="btn-secondary" role="button" :to="`/tunnels/${row.tunnel.id}/frpc`">预览</RouterLink>
+              <RouterLink class="btn-secondary" role="button" :to="`/tunnels/${row.tunnel.id}/frpc`">复制配置</RouterLink>
+              <button class="btn-secondary" type="button" @click="toggleHistory(row.tunnel.id)">{{ historyTunnelId === row.tunnel.id ? '收起流量' : '历史流量' }}</button>
               <a class="btn-secondary" role="button" :href="`/tunnels/${row.tunnel.id}/frpc.toml`">下载</a>
               <a v-if="row.tunnel.tls_mode === 'uploaded_cert'" class="btn-secondary" role="button" :href="`/tunnels/${row.tunnel.id}/frpc.zip`">配置包</a>
               <ConfirmButton message="确定删除这个隧道吗？" @confirm="remove(row.tunnel.id)">删除</ConfirmButton>
             </div>
           </div>
 
-          <div class="grid gap-3 border-t border-white/10 pt-4 md:grid-cols-2">
+          <div class="grid gap-3 border-t border-white/10 pt-4 md:grid-cols-3">
             <div class="rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3">
-              <div class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Local</div>
-              <code class="mt-2 block truncate text-slate-200">{{ row.tunnel.local_host }}:{{ row.tunnel.local_port }}</code>
+              <div class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Status</div>
+              <div class="mt-2 text-lg font-bold text-white">{{ row.current_connections }} 连接</div>
+              <div class="mt-1 text-xs text-slate-500">{{ row.traffic_available ? 'Dashboard 实时数据可用' : '实时数据源未接入' }}</div>
             </div>
             <div class="rounded-2xl border border-cyan-300/10 bg-cyan-300/[0.04] px-4 py-3">
-              <div class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Entry</div>
-              <code v-if="row.tunnel.remote_port" class="mt-2 block text-cyan-100">:{{ row.tunnel.remote_port }}</code>
-              <div v-else-if="row.tunnel.custom_domain" class="mt-2 grid gap-1">
-                <a v-for="domain in customDomains(row.tunnel.custom_domain)" :key="domain" class="block break-all text-cyan-100" :href="`${row.tunnel.protocol}://${domain}`" target="_blank">{{ row.tunnel.protocol }}://{{ domain }}</a>
+              <div class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Persistent</div>
+              <code v-if="row.persistent_traffic_available" class="mt-2 block text-cyan-100">↓ {{ formatBytes(row.persistent_traffic_in) }} / ↑ {{ formatBytes(row.persistent_traffic_out) }}</code>
+              <span v-else class="mt-2 block text-sm text-slate-500">等待 Prometheus 采样</span>
+              <span v-if="row.last_sampled_at" class="mt-1 block text-xs text-slate-500">{{ formatDateTime(row.last_sampled_at) }}</span>
+            </div>
+            <div class="rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3">
+              <div class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Realtime</div>
+              <code v-if="row.traffic_available" class="mt-2 block text-slate-200">↓ {{ formatBytes(row.traffic_in) }} / ↑ {{ formatBytes(row.traffic_out) }}</code>
+              <span v-else class="mt-2 block text-sm text-slate-500">未接入</span>
+            </div>
+          </div>
+
+          <div v-if="historyTunnelId === row.tunnel.id" class="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+            <div class="mb-3 flex items-center justify-between gap-3">
+              <h3 class="font-bold text-white">最近 24 小时流量</h3>
+              <span v-if="historyLoading" class="text-sm text-slate-500">加载中</span>
+            </div>
+            <p v-if="historyError" class="text-sm text-red-200">{{ historyError }}</p>
+            <p v-else-if="!historyLoading && historyPoints.length === 0" class="text-sm text-slate-500">暂无采样点</p>
+            <div v-else class="grid max-h-56 gap-2 overflow-y-auto pr-1">
+              <div v-for="point in historyPoints" :key="point.sampled_at" class="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/[0.03] px-3 py-2 text-sm">
+                <span class="text-slate-400">{{ formatDateTime(point.sampled_at) }}</span>
+                <code class="text-cyan-100">↓ {{ formatBytes(point.traffic_in) }} / ↑ {{ formatBytes(point.traffic_out) }}</code>
               </div>
-              <span v-else class="mt-2 block text-sm text-slate-500">未配置</span>
             </div>
           </div>
         </div>

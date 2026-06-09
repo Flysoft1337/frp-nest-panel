@@ -6,6 +6,7 @@ import { listCertificates } from '../api/certificates'
 import { getDashboardSummary } from '../api/dashboard'
 import { createTunnel, getTunnel, updateTunnel } from '../api/tunnels'
 import type { CertificateInfo, DashboardSummary } from '../api/types'
+import AlertBox from '../components/AlertBox.vue'
 import FormField from '../components/FormField.vue'
 import PageHeader from '../components/PageHeader.vue'
 import SelectField from '../components/SelectField.vue'
@@ -59,6 +60,29 @@ const vhostStatusLabel = computed(() => {
   if (!isDomainTunnel.value) return ''
   return activeVhostPort.value ? `${protocol.value.toUpperCase()} 域名入口已启用：${activeVhostPort.value}` : `${protocol.value.toUpperCase()} 域名入口未启用`
 })
+const entryPreview = computed(() => {
+  if (!summary.value) return '配置加载后显示入口预览'
+  if (isPortTunnel.value) {
+    const port = remotePort.value || (isEdit.value ? '当前端口' : '自动分配')
+    return `${summary.value.frps_server_addr}:${port}`
+  }
+  const domains = customDomain.value
+    .split(/[,\n]/)
+    .map((domain) => domain.trim())
+    .filter(Boolean)
+  if (domains.length === 0) return '填写绑定域名后显示入口预览'
+  return domains.map((domain) => `${protocol.value}://${domain}`).join(' · ')
+})
+const protocolCards = computed(() => protocolOptions.map((option) => ({
+  ...option,
+  description: option.value === 'tcp'
+    ? '开放一个远程 TCP 端口。'
+    : option.value === 'udp'
+      ? '开放一个远程 UDP 端口。'
+      : option.value === 'http'
+        ? '用 HTTP 域名访问本地服务。'
+        : '用 HTTPS 域名访问本地服务。',
+})))
 
 async function loadTunnel() {
   if (!tunnelId.value) return
@@ -129,13 +153,28 @@ onMounted(async () => {
   <PageHeader
     eyebrow="Tunnel"
     :title="isEdit ? '编辑隧道' : '创建隧道'"
-    :description="isEdit ? '修改隧道名称、协议、本地服务和远端入口。' : '选择 TCP 或 UDP，并填写本地服务地址。远程端口可选。'"
+    :description="isEdit ? '修改隧道名称、协议、本地服务和远端入口。' : '先选择协议，再填写本地服务和远端入口。'"
   />
   <section class="card max-w-3xl p-6">
     <p v-if="loadingTunnel" class="mb-4 text-sm text-slate-400">加载中</p>
     <form class="grid gap-5" @submit.prevent="submit">
+      <div class="grid gap-3 md:grid-cols-4">
+        <button
+          v-for="item in protocolCards"
+          :key="item.value"
+          class="rounded-3xl border p-4 text-left transition"
+          :class="protocol === item.value ? 'border-cyan-300/40 bg-cyan-300/[0.08]' : 'border-white/10 bg-white/[0.03] hover:border-cyan-300/20'"
+          type="button"
+          @click="protocol = item.value"
+        >
+          <div class="font-black text-white">{{ item.label }}</div>
+          <div class="mt-2 text-sm text-slate-400">{{ item.description }}</div>
+        </button>
+      </div>
+
       <div class="rounded-3xl border border-cyan-300/20 bg-cyan-300/[0.06] p-4">
-        <div class="text-xs font-bold uppercase tracking-[0.2em] text-cyan-100/80">{{ protocolLabel }}</div>
+        <div class="text-xs font-bold uppercase tracking-[0.2em] text-cyan-100/80">{{ protocolLabel }} 入口预览</div>
+        <code class="mt-2 block break-all text-sm text-cyan-50">{{ entryPreview }}</code>
         <div class="mt-2 text-sm text-slate-300">{{ entryLabel }}</div>
       </div>
 
@@ -146,7 +185,7 @@ onMounted(async () => {
         </div>
         <div class="grid gap-5 md:grid-cols-2">
           <FormField label="隧道名称"><input v-model="name" placeholder="mc-server" required /></FormField>
-          <FormField label="协议"><SelectField v-model="protocol" :options="protocolOptions" /></FormField>
+          <FormField label="当前协议"><input :value="protocolLabel" disabled /></FormField>
         </div>
       </section>
 
@@ -181,7 +220,7 @@ onMounted(async () => {
         <div class="font-semibold">{{ vhostStatusLabel }}</div>
         <div class="mt-1">每行一个域名，最多 8 个。域名需要解析到 frps 服务器。HTTPS 上传证书模式会生成包含证书和私钥的 frpc.zip。</div>
       </div>
-      <p v-if="error" class="rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{{ error }}</p>
+      <AlertBox v-if="error" :message="error" tone="danger" />
       <div class="sticky bottom-4 z-20 flex flex-wrap gap-3 rounded-3xl border border-white/10 bg-slate-950/80 p-3 shadow-2xl shadow-slate-950/60 backdrop-blur-xl">
         <button class="btn-primary" :disabled="loading || loadingTunnel || !vhostEnabled" type="submit">{{ loading ? '保存中' : isEdit ? '保存修改' : '创建' }}</button>
         <RouterLink class="btn-secondary" role="button" to="/dashboard">返回</RouterLink>

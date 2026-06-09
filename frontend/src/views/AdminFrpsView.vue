@@ -157,7 +157,7 @@ async function pollStatus() {
   }
 }
 
-function statusTone(value: FrpsStatus) {
+function statusTone(value: FrpsStatus): 'default' | 'success' | 'danger' {
   if (value.state === 'running') return 'success'
   if (value.state === 'stopped') return 'danger'
   return 'default'
@@ -176,7 +176,7 @@ onMounted(async () => {
   <PageHeader eyebrow="Admin" title="frps 管理" description="编辑本机 frps 配置。保存不会自动重启。" />
   <AdminNav />
 
-  <section v-if="status" class="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+  <section v-if="status" class="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
     <div class="card p-5">
       <div class="text-sm text-slate-400">状态</div>
       <div class="mt-2"><StatusPill :tone="statusTone(status)">{{ status.display_status }}</StatusPill></div>
@@ -184,9 +184,17 @@ onMounted(async () => {
     <StatCard label="版本" :value="status.version" />
     <StatCard label="配置文件" :value="status.config_path" />
     <StatCard label="Token" :value="status.token_set ? '已设置' : '未设置'" />
-    <div class="card p-5 md:col-span-2 xl:col-span-2">
+    <div class="card p-5">
       <div class="text-sm text-slate-400">Dashboard</div>
       <div class="mt-2"><StatusPill :tone="status.dashboard_available ? 'success' : 'default'">{{ status.dashboard_available ? '可用' : status.dashboard_configured ? '不可用' : '未配置' }}</StatusPill></div>
+    </div>
+    <div class="card p-5">
+      <div class="text-sm text-slate-400">Prometheus</div>
+      <div class="mt-2"><StatusPill :tone="status.prometheus_configured ? 'success' : 'default'">{{ status.prometheus_configured ? '已配置' : '未配置' }}</StatusPill></div>
+    </div>
+    <div class="card p-5 md:col-span-2 xl:col-span-1">
+      <div class="text-sm text-slate-400">vhost</div>
+      <div class="mt-2 text-sm text-cyan-100">HTTP {{ status.vhost_http_port || '关闭' }} / HTTPS {{ status.vhost_https_port || '关闭' }}</div>
     </div>
   </section>
 

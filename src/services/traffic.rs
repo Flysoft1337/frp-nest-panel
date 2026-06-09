@@ -1,7 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use anyhow::Result;
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::{DateTime, Duration as ChronoDuration, FixedOffset, Utc};
 use sea_orm::DbErr;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::{
     entities::{traffic_samples, tunnels, users},
-    services::frps::FrpsRuntimeConfig,
+    services::{frpc, frps::FrpsRuntimeConfig},
     state::AppState,
 };
 
@@ -20,6 +20,38 @@ pub struct PersistentTraffic {
     pub traffic_in: u64,
     pub traffic_out: u64,
     pub sampled_at: DateTime<FixedOffset>,
+}
+
+pub struct TrafficHistoryPoint {
+    pub traffic_in: u64,
+    pub traffic_out: u64,
+    pub sampled_at: DateTime<FixedOffset>,
+}
+
+#[derive(Clone, Copy)]
+pub enum TrafficHistoryRange {
+    OneHour,
+    OneDay,
+    SevenDays,
+}
+
+impl TrafficHistoryRange {
+    pub fn parse(value: Option<&str>) -> Option<Self> {
+        match value.unwrap_or("24h") {
+            "1h" => Some(Self::OneHour),
+            "24h" => Some(Self::OneDay),
+            "7d" => Some(Self::SevenDays),
+            _ => None,
+        }
+    }
+
+    fn duration(self) -> ChronoDuration {
+        match self {
+            Self::OneHour => ChronoDuration::hours(1),
+            Self::OneDay => ChronoDuration::days(1),
+            Self::SevenDays => ChronoDuration::days(7),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -73,6 +105,28 @@ pub async fn latest_by_tunnel(
     Ok(latest)
 }
 
+pub async fn history_by_tunnel(
+    db: &DatabaseConnection,
+    tunnel_id: Uuid,
+    range: TrafficHistoryRange,
+) -> std::result::Result<Vec<TrafficHistoryPoint>, DbErr> {
+    let since = (Utc::now() - range.duration()).fixed_offset();
+    let samples = traffic_samples::Entity::find()
+        .filter(traffic_samples::Column::TunnelId.eq(tunnel_id))
+        .filter(traffic_samples::Column::SampledAt.gte(since))
+        .order_by_asc(traffic_samples::Column::SampledAt)
+        .all(db)
+        .await?;
+    Ok(samples
+        .into_iter()
+        .map(|sample| TrafficHistoryPoint {
+            traffic_in: u64::try_from(sample.traffic_in).unwrap_or(0),
+            traffic_out: u64::try_from(sample.traffic_out).unwrap_or(0),
+            sampled_at: sample.sampled_at,
+        })
+        .collect())
+}
+
 async fn collect_once(state: &AppState) -> Result<()> {
     let config = state.frps.read().await.clone();
     if config.dashboard_port.is_none() || !config.enable_prometheus {
@@ -95,16 +149,9 @@ async fn collect_once(state: &AppState) -> Result<()> {
         .into_iter()
         .flat_map(|tunnel| {
             let username = usernames.get(&tunnel.user_id).cloned().unwrap_or_default();
-            [
-                ((tunnel.protocol.clone(), tunnel.name.clone()), tunnel.id),
-                (
-                    (
-                        tunnel.protocol.clone(),
-                        format!("{}.{}", username, tunnel.name),
-                    ),
-                    tunnel.id,
-                ),
-            ]
+            frpc::proxy_names(&username, &tunnel.name)
+                .into_iter()
+                .map(move |proxy_name| (frpc::proxy_key(&tunnel.protocol, &proxy_name), tunnel.id))
         })
         .collect::<HashMap<_, _>>();
     let sampled_at = Utc::now().fixed_offset();

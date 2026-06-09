@@ -39,9 +39,12 @@ pub struct FrpsTrafficSnapshot {
     pub proxies: Vec<FrpsProxyTraffic>,
 }
 
+#[derive(Clone)]
 pub struct FrpsProxyTraffic {
     pub name: String,
     pub protocol: String,
+    pub status: String,
+    pub current_connections: u64,
     pub traffic_in: u64,
     pub traffic_out: u64,
 }
@@ -328,7 +331,9 @@ pub async fn traffic_snapshot(config: &FrpsRuntimeConfig) -> FrpsTrafficSnapshot
         proxies.extend(list.proxies.into_iter().map(|proxy| FrpsProxyTraffic {
             name: proxy_string(&proxy, &["name", "proxyName"]),
             protocol: protocol.to_owned(),
-            traffic_in: proxy_u64(&proxy, &["trafficIn", "todayTrafficIn", "curConns"]),
+            status: proxy_status(&proxy),
+            current_connections: proxy_u64(&proxy, &["curConns", "currentConnections"]),
+            traffic_in: proxy_u64(&proxy, &["trafficIn", "todayTrafficIn"]),
             traffic_out: proxy_u64(&proxy, &["trafficOut", "todayTrafficOut"]),
         }));
     }
@@ -357,6 +362,22 @@ fn proxy_string(proxy: &Value, keys: &[&str]) -> String {
         .find_map(|key| proxy.get(*key).and_then(Value::as_str))
         .unwrap_or("")
         .to_owned()
+}
+
+fn proxy_status(proxy: &Value) -> String {
+    if let Some(status) = proxy
+        .get("status")
+        .or_else(|| proxy.get("phase"))
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+    {
+        return status.to_owned();
+    }
+    if proxy_u64(proxy, &["curConns", "currentConnections"]) > 0 {
+        "online".to_owned()
+    } else {
+        "unknown".to_owned()
+    }
 }
 
 fn proxy_u64(proxy: &Value, keys: &[&str]) -> u64 {

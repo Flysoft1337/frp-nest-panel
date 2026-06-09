@@ -51,6 +51,19 @@ struct FrpcTomlPlugin {
     key_path: &'static str,
 }
 
+pub fn proxy_names(username: &str, tunnel_name: &str) -> Vec<String> {
+    let user_proxy = format!("{username}.{tunnel_name}");
+    if username.is_empty() || user_proxy == tunnel_name {
+        vec![tunnel_name.to_owned()]
+    } else {
+        vec![user_proxy, tunnel_name.to_owned()]
+    }
+}
+
+pub fn proxy_key(protocol: &str, proxy_name: &str) -> (String, String) {
+    (protocol.to_owned(), proxy_name.to_owned())
+}
+
 pub fn render_frpc_toml(
     config: &FrpsRuntimeConfig,
     user: &users::Model,

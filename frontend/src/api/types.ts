@@ -30,10 +30,23 @@ export interface TunnelWithTraffic {
   traffic_available: boolean
   traffic_in: number
   traffic_out: number
+  runtime_status: string
+  current_connections: number
+  matched_proxy_name: string | null
   persistent_traffic_available: boolean
   persistent_traffic_in: number
   persistent_traffic_out: number
   last_sampled_at: string | null
+}
+
+export interface TrafficHistoryPoint {
+  traffic_in: number
+  traffic_out: number
+  sampled_at: string
+}
+
+export interface TrafficHistoryResponse {
+  points: TrafficHistoryPoint[]
 }
 
 export interface FrpcResponse {
@@ -78,6 +91,9 @@ export interface AdminTunnelTraffic {
   username: string
   traffic_in: number
   traffic_out: number
+  runtime_status: string
+  current_connections: number
+  matched_proxy_name: string | null
   persistent_traffic_available: boolean
   persistent_traffic_in: number
   persistent_traffic_out: number

@@ -1,7 +1,7 @@
 use std::io::{Cursor, Write};
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{header, HeaderMap, HeaderValue},
     response::IntoResponse,
     Json,
@@ -17,8 +17,11 @@ use crate::{
     auth::CurrentUser,
     entities::{certificates, tunnels},
     error::{AppError, AppResult},
-    routes::types::{FrpcResponse, OkResponse, TunnelResponse},
-    services::{frpc, ports, validation},
+    routes::types::{
+        FrpcResponse, OkResponse, TrafficHistoryPointResponse, TrafficHistoryResponse,
+        TunnelResponse,
+    },
+    services::{frpc, ports, traffic, validation},
     state::AppState,
 };
 
@@ -32,6 +35,11 @@ pub struct TunnelForm {
     custom_domain: Option<String>,
     tls_mode: Option<String>,
     certificate_id: Option<Uuid>,
+}
+
+#[derive(Deserialize)]
+pub struct TrafficHistoryQuery {
+    range: Option<String>,
 }
 
 pub async fn create(
@@ -154,6 +162,28 @@ pub async fn preview_frpc(
         tunnel: TunnelResponse::from(tunnel),
         frpc_toml,
     }))
+}
+
+pub async fn traffic_history(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    Path(id): Path<Uuid>,
+    Query(query): Query<TrafficHistoryQuery>,
+) -> AppResult<impl IntoResponse> {
+    get_owned_tunnel(&state, user.id, id).await?;
+    let Some(range) = traffic::TrafficHistoryRange::parse(query.range.as_deref()) else {
+        return Err(AppError::BadRequest("流量历史时间范围不合法".to_owned()));
+    };
+    let points = traffic::history_by_tunnel(&state.db, id, range)
+        .await?
+        .into_iter()
+        .map(|point| TrafficHistoryPointResponse {
+            traffic_in: point.traffic_in,
+            traffic_out: point.traffic_out,
+            sampled_at: point.sampled_at,
+        })
+        .collect();
+    Ok(Json(TrafficHistoryResponse { points }))
 }
 
 pub async fn download_frpc(

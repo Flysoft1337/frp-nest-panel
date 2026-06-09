@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { FrpcResponse, Tunnel, TunnelWithTraffic } from './types'
+import type { FrpcResponse, TrafficHistoryResponse, Tunnel, TunnelWithTraffic } from './types'
 
 export interface TunnelInput {
   name: string
@@ -40,4 +40,8 @@ export function deleteTunnel(id: string) {
 
 export function getFrpc(id: string) {
   return api<FrpcResponse>(`/api/tunnels/${id}/frpc`)
+}
+
+export function getTunnelTrafficHistory(id: string, range = '24h') {
+  return api<TrafficHistoryResponse>(`/api/tunnels/${id}/traffic-history?range=${encodeURIComponent(range)}`)
 }

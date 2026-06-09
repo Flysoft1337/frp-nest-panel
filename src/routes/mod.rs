@@ -38,6 +38,10 @@ pub fn router() -> Router<AppState> {
                 .delete(tunnels::delete),
         )
         .route("/api/tunnels/{id}/frpc", get(tunnels::preview_frpc))
+        .route(
+            "/api/tunnels/{id}/traffic-history",
+            get(tunnels::traffic_history),
+        )
         .route("/tunnels/{id}/frpc.toml", get(tunnels::download_frpc))
         .route("/tunnels/{id}/frpc.zip", get(tunnels::download_frpc_bundle))
         .route("/api/admin/config", get(admin::config))
@@ -79,5 +83,9 @@ pub fn router() -> Router<AppState> {
         .route(
             "/api/admin/tunnels/{id}/frpc",
             get(admin::preview_tunnel_frpc),
+        )
+        .route(
+            "/api/admin/tunnels/{id}/traffic-history",
+            get(admin::admin_tunnel_traffic_history),
         )
 }

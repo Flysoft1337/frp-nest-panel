@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 import { getAdminSummary, getAdminTrafficSummary, getConfig } from '../api/admin'
 import type { AdminSummary, AdminTrafficSummary, ConfigResponse } from '../api/types'
@@ -13,6 +13,18 @@ const config = ref<ConfigResponse | null>(null)
 const summary = ref<AdminSummary | null>(null)
 const traffic = ref<AdminTrafficSummary | null>(null)
 const error = ref('')
+const topTrafficTunnels = computed(() => (traffic.value?.tunnels || [])
+  .slice()
+  .sort((left, right) => (right.persistent_traffic_in + right.persistent_traffic_out) - (left.persistent_traffic_in + left.persistent_traffic_out))
+  .slice(0, 5))
+const issueItems = computed(() => {
+  if (!traffic.value) return []
+  const items: string[] = []
+  if (!traffic.value.available) items.push('frps dashboard 实时数据不可用')
+  if (!traffic.value.persistent_available) items.push('Prometheus 长期统计暂无采样')
+  if (traffic.value.tunnels.some((item) => item.runtime_status === 'offline')) items.push('存在离线隧道')
+  return items
+})
 
 function formatBytes(value: number) {
   if (value < 1024) return `${value} B`
@@ -77,6 +89,29 @@ onMounted(async () => {
         <span class="text-slate-400">长期出站</span>
         <div class="mt-2 font-mono text-2xl font-black text-cyan-100">{{ formatBytes(traffic.persistent_total_traffic_out) }}</div>
         <div class="mt-2 text-xs text-slate-500">实时 {{ formatBytes(traffic.total_traffic_out) }}</div>
+      </div>
+    </div>
+  </section>
+
+  <section v-if="traffic" class="mt-6 grid gap-4 lg:grid-cols-2">
+    <div class="card p-6">
+      <h2 class="text-xl font-bold text-white">Top 流量隧道</h2>
+      <div v-if="topTrafficTunnels.length === 0" class="mt-4 text-sm text-slate-500">暂无隧道流量。</div>
+      <div v-else class="mt-4 grid gap-2">
+        <div v-for="row in topTrafficTunnels" :key="row.tunnel.id" class="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm">
+          <div>
+            <div class="font-bold text-white">{{ row.username }} / {{ row.tunnel.name }}</div>
+            <div class="mt-1 text-slate-500">{{ row.tunnel.protocol.toUpperCase() }} · {{ row.runtime_status }}</div>
+          </div>
+          <code class="text-cyan-100">{{ formatBytes(row.persistent_traffic_in + row.persistent_traffic_out) }}</code>
+        </div>
+      </div>
+    </div>
+    <div class="card p-6">
+      <h2 class="text-xl font-bold text-white">需要处理</h2>
+      <div v-if="issueItems.length === 0" class="mt-4 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">数据源和隧道状态正常。</div>
+      <div v-else class="mt-4 grid gap-2">
+        <AlertBox v-for="item in issueItems" :key="item" tone="warning" :message="item" />
       </div>
     </div>
   </section>

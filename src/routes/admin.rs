@@ -21,9 +21,9 @@ use crate::{
         AdminSummaryResponse, AdminTrafficSummaryResponse, AdminTunnelResponse,
         AdminTunnelTrafficResponse, CaddyResponse, ConfigResponse, FrpcResponse,
         FrpsStatusResponse, InviteResponse, OkResponse, PageResponse, PanelTlsResponse, PublicUser,
-        TunnelResponse, UserRowResponse,
+        TrafficHistoryPointResponse, TrafficHistoryResponse, TunnelResponse, UserRowResponse,
     },
-    services::{caddy, frpc, frps, invite, password, validation},
+    services::{caddy, frpc, frps, invite, password, traffic, validation},
     state::AppState,
 };
 
@@ -58,6 +58,11 @@ pub struct PanelTlsForm {
     domain: String,
     certificate_pem: Option<String>,
     private_key_pem: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct TrafficHistoryQuery {
+    range: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -408,6 +413,34 @@ pub async fn preview_tunnel_frpc(
     }))
 }
 
+pub async fn admin_tunnel_traffic_history(
+    State(state): State<AppState>,
+    AdminUser(_user): AdminUser,
+    Path(id): Path<Uuid>,
+    Query(query): Query<TrafficHistoryQuery>,
+) -> AppResult<impl IntoResponse> {
+    if tunnels::Entity::find_by_id(id)
+        .one(&state.db)
+        .await?
+        .is_none()
+    {
+        return Err(AppError::NotFound);
+    }
+    let Some(range) = traffic::TrafficHistoryRange::parse(query.range.as_deref()) else {
+        return Err(AppError::BadRequest("流量历史时间范围不合法".to_owned()));
+    };
+    let points = traffic::history_by_tunnel(&state.db, id, range)
+        .await?
+        .into_iter()
+        .map(|point| TrafficHistoryPointResponse {
+            traffic_in: point.traffic_in,
+            traffic_out: point.traffic_out,
+            sampled_at: point.sampled_at,
+        })
+        .collect();
+    Ok(Json(TrafficHistoryResponse { points }))
+}
+
 pub async fn traffic_summary(
     State(state): State<AppState>,
     AdminUser(_user): AdminUser,
@@ -423,12 +456,7 @@ pub async fn traffic_summary(
     let traffic = snapshot
         .proxies
         .into_iter()
-        .map(|proxy| {
-            (
-                (proxy.protocol, proxy.name),
-                (proxy.traffic_in, proxy.traffic_out),
-            )
-        })
+        .map(|proxy| (frpc::proxy_key(&proxy.protocol, &proxy.name), proxy))
         .collect::<HashMap<_, _>>();
 
     let tunnels = tunnels::Entity::find().all(&state.db).await?;
@@ -448,16 +476,11 @@ pub async fn traffic_summary(
             .get(&tunnel.user_id)
             .cloned()
             .unwrap_or_else(|| "未知用户".to_owned());
-        let user_key = (
-            tunnel.protocol.clone(),
-            format!("{}.{}", username, tunnel.name),
-        );
-        let key = (tunnel.protocol.clone(), tunnel.name.clone());
-        let (traffic_in, traffic_out) = traffic
-            .get(&user_key)
-            .or_else(|| traffic.get(&key))
-            .copied()
-            .unwrap_or((0, 0));
+        let proxy = frpc::proxy_names(&username, &tunnel.name)
+            .into_iter()
+            .find_map(|name| traffic.get(&frpc::proxy_key(&tunnel.protocol, &name)));
+        let traffic_in = proxy.map(|item| item.traffic_in).unwrap_or(0);
+        let traffic_out = proxy.map(|item| item.traffic_out).unwrap_or(0);
         total_traffic_in += traffic_in;
         total_traffic_out += traffic_out;
         let persistent_traffic = persistent.get(&tunnel.id);
@@ -473,6 +496,11 @@ pub async fn traffic_summary(
             tunnel: TunnelResponse::from(tunnel),
             traffic_in,
             traffic_out,
+            runtime_status: proxy
+                .map(|item| item.status.clone())
+                .unwrap_or_else(|| "offline".to_owned()),
+            current_connections: proxy.map(|item| item.current_connections).unwrap_or(0),
+            matched_proxy_name: proxy.map(|item| item.name.clone()),
             persistent_traffic_available: persistent_traffic.is_some(),
             persistent_traffic_in: persistent_traffic.map(|item| item.traffic_in).unwrap_or(0),
             persistent_traffic_out: persistent_traffic.map(|item| item.traffic_out).unwrap_or(0),
