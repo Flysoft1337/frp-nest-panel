@@ -6,6 +6,7 @@ use axum::{
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
 use serde::Deserialize;
+use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
@@ -13,7 +14,7 @@ use crate::{
     entities::{certificates, tunnels},
     error::{AppError, AppResult},
     routes::types::{CertificateResponse, OkResponse},
-    services::certificates as certificate_service,
+    services::{audit, certificates as certificate_service},
     state::AppState,
 };
 
@@ -56,6 +57,8 @@ pub async fn create(
     .await
     .map_err(|error| AppError::BadRequest(format!("保存证书失败: {error}")))?;
 
+    let domain_count = parsed.domains.len();
+    let fingerprint_sha256 = parsed.fingerprint_sha256.clone();
     let cert = certificates::ActiveModel {
         id: Set(certificate_id),
         user_id: Set(user.id),
@@ -72,6 +75,23 @@ pub async fn create(
     }
     .insert(&state.db)
     .await?;
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&user),
+            action: "certificate.upload",
+            resource_type: "certificate",
+            resource_id: Some(cert.id),
+            resource_name: Some(cert.name.clone()),
+            outcome: "success",
+            message: None,
+            metadata: audit::metadata(json!({
+                "domain_count": domain_count,
+                "fingerprint_sha256": fingerprint_sha256,
+            })),
+        },
+    )
+    .await;
 
     Ok(Json(CertificateResponse::from(cert)))
 }
@@ -101,6 +121,20 @@ pub async fn delete(
     certificate_service::remove_certificate_files(user.id, id)
         .await
         .map_err(|error| AppError::BadRequest(format!("删除证书文件失败: {error}")))?;
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&user),
+            action: "certificate.delete",
+            resource_type: "certificate",
+            resource_id: Some(cert.id),
+            resource_name: Some(cert.name),
+            outcome: "success",
+            message: None,
+            metadata: None,
+        },
+    )
+    .await;
     Ok(Json(OkResponse { ok: true }))
 }
 

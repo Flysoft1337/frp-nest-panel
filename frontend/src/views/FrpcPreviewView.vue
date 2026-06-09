@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router'
 import { getFrpc } from '../api/tunnels'
 import type { FrpcResponse } from '../api/types'
 import AlertBox from '../components/AlertBox.vue'
+import ConfigChangeAlert from '../components/ConfigChangeAlert.vue'
 import FrpcConfigPanel from '../components/FrpcConfigPanel.vue'
 import PageHeader from '../components/PageHeader.vue'
 
@@ -33,6 +34,7 @@ onMounted(load)
 
   <section class="card p-6">
     <AlertBox v-if="error" tone="danger" :message="error" />
+    <ConfigChangeAlert v-if="data" class="mb-4" :tunnel="data.tunnel" />
     <FrpcConfigPanel
       :data="data"
       :loading="loading"

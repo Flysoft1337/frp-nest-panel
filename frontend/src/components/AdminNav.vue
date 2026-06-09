@@ -4,6 +4,7 @@ const links = [
   { to: '/admin/invites', label: '邀请码' },
   { to: '/admin/users', label: '用户' },
   { to: '/admin/tunnels', label: '隧道' },
+  { to: '/admin/audit', label: '审计' },
   { to: '/admin/frps', label: 'frps' },
 ]
 </script>

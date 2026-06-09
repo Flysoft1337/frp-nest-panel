@@ -22,6 +22,11 @@ pub struct Model {
     pub proxy_protocol_version: Option<String>,
     pub locations: Option<String>,
     pub host_header_rewrite: Option<String>,
+    pub updated_at: DateTimeWithTimeZone,
+    pub config_changed_at: DateTimeWithTimeZone,
+    pub last_config_viewed_at: Option<DateTimeWithTimeZone>,
+    pub last_config_downloaded_at: Option<DateTimeWithTimeZone>,
+    pub config_version: i32,
     pub created_at: DateTimeWithTimeZone,
 }
 

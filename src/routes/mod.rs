@@ -46,6 +46,7 @@ pub fn router() -> Router<AppState> {
         .route("/tunnels/{id}/frpc.zip", get(tunnels::download_frpc_bundle))
         .route("/api/admin/config", get(admin::config))
         .route("/api/admin/summary", get(admin::summary))
+        .route("/api/admin/audit-logs", get(admin::audit_log_list))
         .route(
             "/api/admin/frps",
             get(admin::frps_status).put(admin::update_frps),

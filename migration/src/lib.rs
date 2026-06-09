@@ -7,6 +7,7 @@ mod m20260608_000004_add_user_max_tunnels;
 mod m20260608_000005_add_domain_tunnels_and_certificates;
 mod m20260609_000006_create_traffic_samples;
 mod m20260609_000007_add_tunnel_advanced_options;
+mod m20260609_000008_add_audit_logs_and_tunnel_config_state;
 
 pub struct Migrator;
 
@@ -21,6 +22,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260608_000005_add_domain_tunnels_and_certificates::Migration),
             Box::new(m20260609_000006_create_traffic_samples::Migration),
             Box::new(m20260609_000007_add_tunnel_advanced_options::Migration),
+            Box::new(m20260609_000008_add_audit_logs_and_tunnel_config_state::Migration),
         ]
     }
 }

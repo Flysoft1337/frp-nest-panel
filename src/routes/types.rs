@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::{
     config::Config,
-    entities::{certificates, invite_codes, tunnels, users},
+    entities::{audit_logs, certificates, invite_codes, tunnels, users},
 };
 
 #[derive(Serialize)]
@@ -59,6 +59,12 @@ pub struct TunnelResponse {
     pub proxy_protocol_version: Option<String>,
     pub locations: Option<String>,
     pub host_header_rewrite: Option<String>,
+    pub updated_at: DateTime<FixedOffset>,
+    pub config_changed_at: DateTime<FixedOffset>,
+    pub last_config_viewed_at: Option<DateTime<FixedOffset>>,
+    pub last_config_downloaded_at: Option<DateTime<FixedOffset>>,
+    pub config_version: i32,
+    pub config_stale: bool,
     pub created_at: DateTime<FixedOffset>,
 }
 
@@ -89,8 +95,22 @@ pub struct TrafficHistoryResponse {
     pub points: Vec<TrafficHistoryPointResponse>,
 }
 
+fn config_stale(tunnel: &tunnels::Model) -> bool {
+    let last_seen = tunnel
+        .last_config_viewed_at
+        .as_ref()
+        .into_iter()
+        .chain(tunnel.last_config_downloaded_at.as_ref())
+        .max()
+        .cloned();
+    last_seen
+        .map(|time| time < tunnel.config_changed_at)
+        .unwrap_or(true)
+}
+
 impl From<tunnels::Model> for TunnelResponse {
     fn from(tunnel: tunnels::Model) -> Self {
+        let config_stale = config_stale(&tunnel);
         Self {
             id: tunnel.id,
             user_id: tunnel.user_id,
@@ -109,6 +129,12 @@ impl From<tunnels::Model> for TunnelResponse {
             proxy_protocol_version: tunnel.proxy_protocol_version,
             locations: tunnel.locations,
             host_header_rewrite: tunnel.host_header_rewrite,
+            updated_at: tunnel.updated_at,
+            config_changed_at: tunnel.config_changed_at,
+            last_config_viewed_at: tunnel.last_config_viewed_at,
+            last_config_downloaded_at: tunnel.last_config_downloaded_at,
+            config_version: tunnel.config_version,
+            config_stale,
             created_at: tunnel.created_at,
         }
     }
@@ -181,6 +207,45 @@ pub struct UserRowResponse {
 pub struct AdminTunnelResponse {
     pub tunnel: TunnelResponse,
     pub username: String,
+}
+
+#[derive(Serialize)]
+pub struct AuditLogResponse {
+    pub id: Uuid,
+    pub actor_user_id: Option<Uuid>,
+    pub actor_username: Option<String>,
+    pub actor_role: Option<String>,
+    pub action: String,
+    pub resource_type: String,
+    pub resource_id: Option<Uuid>,
+    pub resource_name: Option<String>,
+    pub outcome: String,
+    pub message: Option<String>,
+    pub metadata_json: Option<String>,
+    pub ip_address: Option<String>,
+    pub user_agent: Option<String>,
+    pub created_at: DateTime<FixedOffset>,
+}
+
+impl From<audit_logs::Model> for AuditLogResponse {
+    fn from(item: audit_logs::Model) -> Self {
+        Self {
+            id: item.id,
+            actor_user_id: item.actor_user_id,
+            actor_username: item.actor_username,
+            actor_role: item.actor_role,
+            action: item.action,
+            resource_type: item.resource_type,
+            resource_id: item.resource_id,
+            resource_name: item.resource_name,
+            outcome: item.outcome,
+            message: item.message,
+            metadata_json: item.metadata_json,
+            ip_address: item.ip_address,
+            user_agent: item.user_agent,
+            created_at: item.created_at,
+        }
+    }
 }
 
 #[derive(Serialize)]

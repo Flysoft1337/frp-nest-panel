@@ -1,17 +1,24 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 import { getDashboardSummary } from '../api/dashboard'
 import { deleteTunnel, getTunnelTrafficHistory, listTunnels } from '../api/tunnels'
 import type { DashboardSummary, TrafficHistoryPoint, TunnelWithTraffic } from '../api/types'
+import AlertBox from '../components/AlertBox.vue'
+import ConfigChangeAlert from '../components/ConfigChangeAlert.vue'
 import ConfirmButton from '../components/ConfirmButton.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusPill from '../components/StatusPill.vue'
+import TrafficChart from '../components/TrafficChart.vue'
 
+const route = useRoute()
+const router = useRouter()
 const tunnels = ref<TunnelWithTraffic[]>([])
 const summary = ref<DashboardSummary | null>(null)
 const loading = ref(true)
 const error = ref('')
+const message = ref('')
 const historyTunnelId = ref<string | null>(null)
 const historyLoading = ref(false)
 const historyError = ref('')
@@ -106,13 +113,21 @@ async function remove(id: string) {
   await load()
 }
 
-onMounted(load)
+onMounted(async () => {
+  if (route.query.config === 'updated') {
+    message.value = '隧道已保存。请重新复制或下载 frpc 配置，并重启或 reload frpc。'
+    await router.replace('/dashboard')
+  }
+  await load()
+})
 </script>
 
 <template>
   <PageHeader eyebrow="Dashboard" title="我的隧道" description="创建和管理 TCP、UDP、HTTP 和 HTTPS frp 隧道。">
     <RouterLink class="btn-primary" role="button" to="/tunnels/new">创建隧道</RouterLink>
   </PageHeader>
+
+  <AlertBox v-if="message" class="mb-4" tone="success" :message="message" />
 
   <section v-if="summary" class="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
     <div class="card p-5">
@@ -157,6 +172,7 @@ onMounted(load)
                 <h2 class="truncate text-lg font-black text-white">{{ row.tunnel.name }}</h2>
                 <StatusPill tone="default">{{ row.tunnel.protocol.toUpperCase() }}</StatusPill>
                 <StatusPill :tone="statusTone(row.runtime_status)">{{ statusText(row.runtime_status) }}</StatusPill>
+                <StatusPill v-if="row.tunnel.config_stale" tone="danger">配置待更新</StatusPill>
               </div>
               <div class="mt-2 grid gap-1 text-sm text-slate-400">
                 <code class="break-all text-cyan-100">{{ entryValue(row) }}</code>
@@ -177,6 +193,8 @@ onMounted(load)
             </div>
           </div>
 
+          <ConfigChangeAlert v-if="row.tunnel.config_stale" :tunnel="row.tunnel" compact />
+
           <div class="grid gap-3 border-t border-white/10 pt-4 md:grid-cols-3">
             <div class="rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3">
               <div class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Status</div>
@@ -196,19 +214,9 @@ onMounted(load)
             </div>
           </div>
 
-          <div v-if="historyTunnelId === row.tunnel.id" class="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
-            <div class="mb-3 flex items-center justify-between gap-3">
-              <h3 class="font-bold text-white">最近 24 小时流量</h3>
-              <span v-if="historyLoading" class="text-sm text-slate-500">加载中</span>
-            </div>
-            <p v-if="historyError" class="text-sm text-red-200">{{ historyError }}</p>
-            <p v-else-if="!historyLoading && historyPoints.length === 0" class="text-sm text-slate-500">暂无采样点</p>
-            <div v-else class="grid max-h-56 gap-2 overflow-y-auto pr-1">
-              <div v-for="point in historyPoints" :key="point.sampled_at" class="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/[0.03] px-3 py-2 text-sm">
-                <span class="text-slate-400">{{ formatDateTime(point.sampled_at) }}</span>
-                <code class="text-cyan-100">↓ {{ formatBytes(point.traffic_in) }} / ↑ {{ formatBytes(point.traffic_out) }}</code>
-              </div>
-            </div>
+          <div v-if="historyTunnelId === row.tunnel.id" class="grid gap-3">
+            <p v-if="historyError" class="rounded-2xl border border-red-300/20 bg-red-400/10 p-4 text-sm text-red-100">{{ historyError }}</p>
+            <TrafficChart v-else :points="historyPoints" :loading="historyLoading" />
           </div>
         </div>
       </article>

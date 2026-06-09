@@ -1,3 +1,4 @@
+pub mod audit;
 pub mod caddy;
 pub mod certificates;
 pub mod frpc;

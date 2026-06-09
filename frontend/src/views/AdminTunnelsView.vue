@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 
-import { deleteTunnel, getAdminTrafficSummary, getAdminTunnelFrpc, listAllTunnels } from '../api/admin'
-import type { AdminTrafficSummary, AdminTunnelRow, FrpcResponse, PageResponse } from '../api/types'
+import { deleteTunnel, getAdminTrafficSummary, getAdminTunnelFrpc, getAdminTunnelTrafficHistory, listAllTunnels } from '../api/admin'
+import type { AdminTrafficSummary, AdminTunnelRow, FrpcResponse, PageResponse, TrafficHistoryPoint } from '../api/types'
 import AdminNav from '../components/AdminNav.vue'
 import AlertBox from '../components/AlertBox.vue'
 import ConfirmButton from '../components/ConfirmButton.vue'
+import ConfigChangeAlert from '../components/ConfigChangeAlert.vue'
 import FrpcConfigPanel from '../components/FrpcConfigPanel.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import SelectField from '../components/SelectField.vue'
 import StatusPill from '../components/StatusPill.vue'
 import Toolbar from '../components/Toolbar.vue'
+import TrafficChart from '../components/TrafficChart.vue'
 
 const page = ref<PageResponse<AdminTunnelRow> | null>(null)
 const q = ref('')
@@ -23,6 +25,10 @@ const loading = ref(true)
 const traffic = ref<AdminTrafficSummary | null>(null)
 const frpcPreview = ref<FrpcResponse | null>(null)
 const frpcPreviewTitle = ref('')
+const historyTunnelId = ref<string | null>(null)
+const historyLoading = ref(false)
+const historyError = ref('')
+const historyPoints = ref<TrafficHistoryPoint[]>([])
 const searchDebounce = ref<number | null>(null)
 const protocolOptions = [
   { label: '全部协议', value: '' },
@@ -125,6 +131,26 @@ async function downloadFrpc(row: AdminTunnelRow) {
   }
 }
 
+async function toggleHistory(id: string) {
+  if (historyTunnelId.value === id) {
+    historyTunnelId.value = null
+    historyPoints.value = []
+    historyError.value = ''
+    return
+  }
+  historyTunnelId.value = id
+  historyLoading.value = true
+  historyError.value = ''
+  historyPoints.value = []
+  try {
+    historyPoints.value = (await getAdminTunnelTrafficHistory(id)).points
+  } catch (err) {
+    historyError.value = err instanceof Error ? err.message : '历史流量加载失败'
+  } finally {
+    historyLoading.value = false
+  }
+}
+
 watch([q, status], () => {
   currentPage.value = 1
   if (searchDebounce.value) window.clearTimeout(searchDebounce.value)
@@ -176,6 +202,7 @@ onMounted(async () => {
                 <h2 class="truncate text-lg font-black text-white">{{ row.tunnel.name }}</h2>
                 <StatusPill>{{ row.tunnel.protocol.toUpperCase() }}</StatusPill>
                 <StatusPill :tone="statusTone(trafficRow(row.tunnel.id)?.runtime_status)">{{ trafficRow(row.tunnel.id)?.runtime_status || 'unknown' }}</StatusPill>
+                <StatusPill v-if="row.tunnel.config_stale" tone="danger">配置待更新</StatusPill>
               </div>
               <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-400">
                 <span>用户 <strong class="text-slate-200">{{ row.username }}</strong></span>
@@ -189,9 +216,12 @@ onMounted(async () => {
             <div class="flex flex-wrap gap-2">
               <button class="btn-secondary" type="button" @click="previewFrpc(row)">预览 frpc</button>
               <button class="btn-secondary" type="button" @click="downloadFrpc(row)">下载 frpc</button>
+              <button class="btn-secondary" type="button" @click="toggleHistory(row.tunnel.id)">{{ historyTunnelId === row.tunnel.id ? '收起流量' : '流量图表' }}</button>
               <ConfirmButton message="确定删除这个隧道吗？" @confirm="remove(row.tunnel.id)">删除</ConfirmButton>
             </div>
           </div>
+
+          <ConfigChangeAlert v-if="row.tunnel.config_stale" :tunnel="row.tunnel" compact />
 
           <div class="grid gap-3 border-t border-white/10 pt-4 md:grid-cols-3">
             <div class="rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3">
@@ -212,6 +242,11 @@ onMounted(async () => {
               <span v-else class="mt-2 block text-sm text-slate-500">等待采样</span>
             </div>
           </div>
+
+          <div v-if="historyTunnelId === row.tunnel.id" class="grid gap-3">
+            <p v-if="historyError" class="rounded-2xl border border-red-300/20 bg-red-400/10 p-4 text-sm text-red-100">{{ historyError }}</p>
+            <TrafficChart v-else :points="historyPoints" :loading="historyLoading" />
+          </div>
         </div>
       </article>
     </div>
@@ -224,11 +259,12 @@ onMounted(async () => {
         </div>
         <button class="btn-secondary" type="button" @click="frpcPreview = null">关闭</button>
       </div>
+      <ConfigChangeAlert class="mb-4" :tunnel="frpcPreview.tunnel" />
       <FrpcConfigPanel
         :data="frpcPreview"
         :title="frpcPreviewTitle"
-        :download-href="`/tunnels/${frpcPreview.tunnel.id}/frpc.toml`"
-        :bundle-href="frpcPreview.tunnel.tls_mode === 'uploaded_cert' ? `/tunnels/${frpcPreview.tunnel.id}/frpc.zip` : null"
+        :download-href="undefined"
+        :bundle-href="null"
       />
     </div>
 

@@ -85,5 +85,10 @@ pub enum Tunnels {
     ProxyProtocolVersion,
     Locations,
     HostHeaderRewrite,
+    UpdatedAt,
+    ConfigChangedAt,
+    LastConfigViewedAt,
+    LastConfigDownloadedAt,
+    ConfigVersion,
     CreatedAt,
 }

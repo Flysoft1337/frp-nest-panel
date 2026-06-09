@@ -1,0 +1,176 @@
+use sea_orm_migration::prelude::*;
+
+use crate::{m20260605_000001_create_users::Users, m20260605_000003_create_tunnels::Tunnels};
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Tunnels::Table)
+                    .add_column(
+                        ColumnDef::new(Tunnels::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .add_column(
+                        ColumnDef::new(Tunnels::ConfigChangedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .add_column(
+                        ColumnDef::new(Tunnels::LastConfigViewedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .add_column(
+                        ColumnDef::new(Tunnels::LastConfigDownloadedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .add_column(
+                        ColumnDef::new(Tunnels::ConfigVersion)
+                            .integer()
+                            .not_null()
+                            .default(1),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table(AuditLogs::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(AuditLogs::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(AuditLogs::ActorUserId).uuid().null())
+                    .col(
+                        ColumnDef::new(AuditLogs::ActorUsername)
+                            .string_len(64)
+                            .null(),
+                    )
+                    .col(ColumnDef::new(AuditLogs::ActorRole).string_len(16).null())
+                    .col(ColumnDef::new(AuditLogs::Action).string_len(64).not_null())
+                    .col(
+                        ColumnDef::new(AuditLogs::ResourceType)
+                            .string_len(64)
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(AuditLogs::ResourceId).uuid().null())
+                    .col(
+                        ColumnDef::new(AuditLogs::ResourceName)
+                            .string_len(255)
+                            .null(),
+                    )
+                    .col(ColumnDef::new(AuditLogs::Outcome).string_len(16).not_null())
+                    .col(ColumnDef::new(AuditLogs::Message).text().null())
+                    .col(ColumnDef::new(AuditLogs::MetadataJson).text().null())
+                    .col(ColumnDef::new(AuditLogs::IpAddress).string_len(128).null())
+                    .col(ColumnDef::new(AuditLogs::UserAgent).text().null())
+                    .col(
+                        ColumnDef::new(AuditLogs::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_audit_logs_actor_user_id")
+                            .from(AuditLogs::Table, AuditLogs::ActorUserId)
+                            .to(Users::Table, Users::Id)
+                            .on_delete(ForeignKeyAction::SetNull),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_audit_logs_created_at")
+                    .table(AuditLogs::Table)
+                    .col(AuditLogs::CreatedAt)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_audit_logs_actor_created_at")
+                    .table(AuditLogs::Table)
+                    .col(AuditLogs::ActorUserId)
+                    .col(AuditLogs::CreatedAt)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_audit_logs_action_created_at")
+                    .table(AuditLogs::Table)
+                    .col(AuditLogs::Action)
+                    .col(AuditLogs::CreatedAt)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_audit_logs_resource_created_at")
+                    .table(AuditLogs::Table)
+                    .col(AuditLogs::ResourceType)
+                    .col(AuditLogs::ResourceId)
+                    .col(AuditLogs::CreatedAt)
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(AuditLogs::Table).to_owned())
+            .await?;
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Tunnels::Table)
+                    .drop_column(Tunnels::ConfigVersion)
+                    .drop_column(Tunnels::LastConfigDownloadedAt)
+                    .drop_column(Tunnels::LastConfigViewedAt)
+                    .drop_column(Tunnels::ConfigChangedAt)
+                    .drop_column(Tunnels::UpdatedAt)
+                    .to_owned(),
+            )
+            .await
+    }
+}
+
+#[derive(DeriveIden)]
+pub enum AuditLogs {
+    Table,
+    Id,
+    ActorUserId,
+    ActorUsername,
+    ActorRole,
+    Action,
+    ResourceType,
+    ResourceId,
+    ResourceName,
+    Outcome,
+    Message,
+    MetadataJson,
+    IpAddress,
+    UserAgent,
+    CreatedAt,
+}

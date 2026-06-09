@@ -29,6 +29,12 @@ export interface Tunnel {
   proxy_protocol_version: string | null
   locations: string | null
   host_header_rewrite: string | null
+  updated_at: string
+  config_changed_at: string
+  last_config_viewed_at: string | null
+  last_config_downloaded_at: string | null
+  config_version: number
+  config_stale: boolean
   created_at: string
 }
 
@@ -107,6 +113,23 @@ export interface AdminTunnelTraffic {
   last_sampled_at: string | null
 }
 
+export interface AuditLog {
+  id: string
+  actor_user_id: string | null
+  actor_username: string | null
+  actor_role: string | null
+  action: string
+  resource_type: string
+  resource_id: string | null
+  resource_name: string | null
+  outcome: string
+  message: string | null
+  metadata_json: string | null
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
+}
+
 export interface PageResponse<T> {
   items: T[]
   total: number
@@ -117,6 +140,15 @@ export interface PageResponse<T> {
 export interface ListParams {
   q?: string
   status?: string
+  page?: number
+  page_size?: number
+}
+
+export interface AuditLogParams {
+  q?: string
+  action?: string
+  resource_type?: string
+  outcome?: string
   page?: number
   page_size?: number
 }

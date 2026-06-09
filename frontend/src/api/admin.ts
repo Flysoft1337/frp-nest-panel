@@ -3,6 +3,8 @@ import type {
   AdminSummary,
   AdminTrafficSummary,
   AdminTunnelRow,
+  AuditLog,
+  AuditLogParams,
   CaddyStatus,
   ConfigResponse,
   FrpcResponse,
@@ -26,6 +28,18 @@ function withParams(path: string, params: ListParams = {}) {
   return text ? `${path}?${text}` : path
 }
 
+function withAuditParams(path: string, params: AuditLogParams = {}) {
+  const query = new URLSearchParams()
+  if (params.q) query.set('q', params.q)
+  if (params.action) query.set('action', params.action)
+  if (params.resource_type) query.set('resource_type', params.resource_type)
+  if (params.outcome) query.set('outcome', params.outcome)
+  if (params.page) query.set('page', String(params.page))
+  if (params.page_size) query.set('page_size', String(params.page_size))
+  const text = query.toString()
+  return text ? `${path}?${text}` : path
+}
+
 export function getConfig() {
   return api<ConfigResponse>('/api/admin/config')
 }
@@ -36,6 +50,10 @@ export function getAdminSummary() {
 
 export function getAdminTrafficSummary() {
   return api<AdminTrafficSummary>('/api/admin/traffic/summary')
+}
+
+export function listAuditLogs(params?: AuditLogParams) {
+  return api<PageResponse<AuditLog>>(withAuditParams('/api/admin/audit-logs', params))
 }
 
 export function listInvites(params?: ListParams) {

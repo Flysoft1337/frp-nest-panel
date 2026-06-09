@@ -173,7 +173,7 @@ async function submit() {
     } else {
       await createTunnel(input)
     }
-    await router.push('/dashboard')
+    await router.push({ path: '/dashboard', query: { config: 'updated' } })
   } catch (err) {
     error.value = err instanceof Error ? err.message : isEdit.value ? '保存失败' : '创建失败'
   } finally {

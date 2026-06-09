@@ -11,6 +11,7 @@ use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter,
 };
 use serde::Deserialize;
+use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
@@ -21,7 +22,7 @@ use crate::{
         FrpcResponse, OkResponse, TrafficHistoryPointResponse, TrafficHistoryResponse,
         TunnelResponse,
     },
-    services::{frpc, ports, traffic, validation},
+    services::{audit, frpc, ports, traffic, validation},
     state::AppState,
 };
 
@@ -101,7 +102,10 @@ pub async fn create(
 
             let result = insert_tunnel(&state, user.id, &input, Some(remote_port)).await;
             match result {
-                Ok(tunnel) => return Ok(Json(TunnelResponse::from(tunnel))),
+                Ok(tunnel) => {
+                    audit_tunnel_create(&state, &user, &tunnel).await;
+                    return Ok(Json(TunnelResponse::from(tunnel)));
+                }
                 Err(sea_orm::DbErr::Exec(error)) if error.to_string().contains("remote_port") => {
                     continue
                 }
@@ -112,6 +116,7 @@ pub async fn create(
     }
 
     let tunnel = insert_tunnel(&state, user.id, &input, None).await?;
+    audit_tunnel_create(&state, &user, &tunnel).await;
     Ok(Json(TunnelResponse::from(tunnel)))
 }
 
@@ -133,6 +138,10 @@ pub async fn update(
     let tunnel = get_owned_tunnel(&state, user.id, id).await?;
     let input = validate_tunnel_form(&state, user.id, Some(id), form).await?;
     let remote_port = update_remote_port(&state, &tunnel, &input).await?;
+    let changed_fields = changed_config_fields(&tunnel, &input, remote_port);
+    let config_changed = !changed_fields.is_empty();
+    let config_version = tunnel.config_version;
+    let now = Utc::now().fixed_offset();
 
     let mut active: tunnels::ActiveModel = tunnel.into();
     active.name = Set(input.name);
@@ -150,7 +159,27 @@ pub async fn update(
     active.proxy_protocol_version = Set(input.proxy_protocol_version);
     active.locations = Set(input.locations);
     active.host_header_rewrite = Set(input.host_header_rewrite);
+    active.updated_at = Set(now);
+    if config_changed {
+        active.config_changed_at = Set(now);
+        active.config_version = Set(config_version + 1);
+    }
     let tunnel = active.update(&state.db).await?;
+
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&user),
+            action: "tunnel.update",
+            resource_type: "tunnel",
+            resource_id: Some(tunnel.id),
+            resource_name: Some(tunnel.name.clone()),
+            outcome: "success",
+            message: None,
+            metadata: audit::changed_fields(changed_fields),
+        },
+    )
+    .await;
 
     Ok(Json(TunnelResponse::from(tunnel)))
 }
@@ -160,8 +189,22 @@ pub async fn delete(
     CurrentUser(user): CurrentUser,
     Path(id): Path<Uuid>,
 ) -> AppResult<impl IntoResponse> {
-    get_owned_tunnel(&state, user.id, id).await?;
+    let tunnel = get_owned_tunnel(&state, user.id, id).await?;
     tunnels::Entity::delete_by_id(id).exec(&state.db).await?;
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&user),
+            action: "tunnel.delete",
+            resource_type: "tunnel",
+            resource_id: Some(tunnel.id),
+            resource_name: Some(tunnel.name),
+            outcome: "success",
+            message: None,
+            metadata: None,
+        },
+    )
+    .await;
     Ok(Json(OkResponse { ok: true }))
 }
 
@@ -172,8 +215,25 @@ pub async fn preview_frpc(
 ) -> AppResult<impl IntoResponse> {
     let tunnel = get_owned_tunnel(&state, user.id, id).await?;
 
-    let frps = state.frps.read().await;
-    let frpc_toml = frpc::render_frpc_toml(&frps, &user, &tunnel);
+    let frpc_toml = {
+        let frps = state.frps.read().await;
+        frpc::render_frpc_toml(&frps, &user, &tunnel)
+    };
+    let tunnel = mark_config_viewed(&state, tunnel).await?;
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&user),
+            action: "tunnel.frpc_preview",
+            resource_type: "tunnel",
+            resource_id: Some(tunnel.id),
+            resource_name: Some(tunnel.name.clone()),
+            outcome: "success",
+            message: None,
+            metadata: None,
+        },
+    )
+    .await;
     Ok(Json(FrpcResponse {
         tunnel: TunnelResponse::from(tunnel),
         frpc_toml,
@@ -209,8 +269,25 @@ pub async fn download_frpc(
 ) -> AppResult<impl IntoResponse> {
     let tunnel = get_owned_tunnel(&state, user.id, id).await?;
 
-    let frps = state.frps.read().await;
-    let body = frpc::render_frpc_toml(&frps, &user, &tunnel);
+    let body = {
+        let frps = state.frps.read().await;
+        frpc::render_frpc_toml(&frps, &user, &tunnel)
+    };
+    let tunnel = mark_config_downloaded(&state, tunnel).await?;
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&user),
+            action: "tunnel.frpc_download",
+            resource_type: "tunnel",
+            resource_id: Some(tunnel.id),
+            resource_name: Some(tunnel.name),
+            outcome: "success",
+            message: None,
+            metadata: None,
+        },
+    )
+    .await;
     let mut headers = HeaderMap::new();
     headers.insert(
         header::CONTENT_TYPE,
@@ -229,8 +306,10 @@ pub async fn download_frpc_bundle(
     Path(id): Path<Uuid>,
 ) -> AppResult<impl IntoResponse> {
     let tunnel = get_owned_tunnel(&state, user.id, id).await?;
-    let frps = state.frps.read().await;
-    let frpc_toml = frpc::render_frpc_toml(&frps, &user, &tunnel);
+    let frpc_toml = {
+        let frps = state.frps.read().await;
+        frpc::render_frpc_toml(&frps, &user, &tunnel)
+    };
     let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
     let options: zip::write::SimpleFileOptions = zip::write::FileOptions::default();
     zip.start_file("frpc.toml", options)
@@ -261,6 +340,21 @@ pub async fn download_frpc_bundle(
         .finish()
         .map_err(|error| AppError::BadRequest(format!("生成配置包失败: {error}")))?
         .into_inner();
+    let tunnel = mark_config_downloaded(&state, tunnel).await?;
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&user),
+            action: "tunnel.frpc_bundle_download",
+            resource_type: "tunnel",
+            resource_id: Some(tunnel.id),
+            resource_name: Some(tunnel.name),
+            outcome: "success",
+            message: None,
+            metadata: None,
+        },
+    )
+    .await;
     let mut headers = HeaderMap::new();
     headers.insert(
         header::CONTENT_TYPE,
@@ -528,6 +622,7 @@ async fn insert_tunnel(
     input: &ValidTunnelInput,
     remote_port: Option<i32>,
 ) -> Result<tunnels::Model, sea_orm::DbErr> {
+    let now = Utc::now().fixed_offset();
     tunnels::ActiveModel {
         id: Set(Uuid::new_v4()),
         user_id: Set(user_id),
@@ -546,10 +641,109 @@ async fn insert_tunnel(
         proxy_protocol_version: Set(input.proxy_protocol_version.clone()),
         locations: Set(input.locations.clone()),
         host_header_rewrite: Set(input.host_header_rewrite.clone()),
-        created_at: Set(Utc::now().fixed_offset()),
+        updated_at: Set(now),
+        config_changed_at: Set(now),
+        last_config_viewed_at: Set(None),
+        last_config_downloaded_at: Set(None),
+        config_version: Set(1),
+        created_at: Set(now),
     }
     .insert(&state.db)
     .await
+}
+
+fn changed_config_fields(
+    tunnel: &tunnels::Model,
+    input: &ValidTunnelInput,
+    remote_port: Option<i32>,
+) -> Vec<&'static str> {
+    let mut fields = Vec::new();
+    if tunnel.name != input.name.as_str() {
+        fields.push("name");
+    }
+    if tunnel.protocol != input.protocol.as_str() {
+        fields.push("protocol");
+    }
+    if tunnel.local_host != input.local_host.as_str() {
+        fields.push("local_host");
+    }
+    if tunnel.local_port != input.local_port {
+        fields.push("local_port");
+    }
+    if tunnel.remote_port != remote_port {
+        fields.push("remote_port");
+    }
+    if tunnel.custom_domain.as_ref() != input.custom_domain.as_ref() {
+        fields.push("custom_domain");
+    }
+    if tunnel.tls_mode.as_ref() != input.tls_mode.as_ref() {
+        fields.push("tls_mode");
+    }
+    if tunnel.certificate_id != input.certificate_id {
+        fields.push("certificate_id");
+    }
+    if tunnel.use_encryption != input.use_encryption {
+        fields.push("use_encryption");
+    }
+    if tunnel.use_compression != input.use_compression {
+        fields.push("use_compression");
+    }
+    if tunnel.bandwidth_limit.as_ref() != input.bandwidth_limit.as_ref() {
+        fields.push("bandwidth_limit");
+    }
+    if tunnel.bandwidth_limit_mode.as_ref() != input.bandwidth_limit_mode.as_ref() {
+        fields.push("bandwidth_limit_mode");
+    }
+    if tunnel.proxy_protocol_version.as_ref() != input.proxy_protocol_version.as_ref() {
+        fields.push("proxy_protocol_version");
+    }
+    if tunnel.locations.as_ref() != input.locations.as_ref() {
+        fields.push("locations");
+    }
+    if tunnel.host_header_rewrite.as_ref() != input.host_header_rewrite.as_ref() {
+        fields.push("host_header_rewrite");
+    }
+    fields
+}
+
+async fn mark_config_viewed(state: &AppState, tunnel: tunnels::Model) -> AppResult<tunnels::Model> {
+    let mut active: tunnels::ActiveModel = tunnel.into();
+    active.last_config_viewed_at = Set(Some(Utc::now().fixed_offset()));
+    Ok(active.update(&state.db).await?)
+}
+
+async fn mark_config_downloaded(
+    state: &AppState,
+    tunnel: tunnels::Model,
+) -> AppResult<tunnels::Model> {
+    let mut active: tunnels::ActiveModel = tunnel.into();
+    active.last_config_downloaded_at = Set(Some(Utc::now().fixed_offset()));
+    Ok(active.update(&state.db).await?)
+}
+
+async fn audit_tunnel_create(
+    state: &AppState,
+    user: &crate::entities::users::Model,
+    tunnel: &tunnels::Model,
+) {
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(user),
+            action: "tunnel.create",
+            resource_type: "tunnel",
+            resource_id: Some(tunnel.id),
+            resource_name: Some(tunnel.name.clone()),
+            outcome: "success",
+            message: None,
+            metadata: audit::metadata(json!({
+                "protocol": &tunnel.protocol,
+                "remote_port": tunnel.remote_port,
+                "domain_count": tunnel.custom_domain.as_deref().map(|value| value.split(',').filter(|item| !item.trim().is_empty()).count()).unwrap_or(0),
+            })),
+        },
+    )
+    .await;
 }
 
 async fn ensure_domain_available(

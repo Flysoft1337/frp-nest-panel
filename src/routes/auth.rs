@@ -10,7 +10,7 @@ use crate::{
     entities::{invite_codes, users},
     error::{AppError, AppResult},
     routes::types::{OkResponse, PublicUser, SessionResponse},
-    services::{password, validation},
+    services::{audit, password, validation},
     state::AppState,
 };
 
@@ -55,6 +55,20 @@ pub async fn login(
         return Err(AppError::BadRequest("用户名或密码错误".to_owned()));
     }
     session.insert(SESSION_USER_ID, user.id).await?;
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&user),
+            action: "auth.login",
+            resource_type: "user",
+            resource_id: Some(user.id),
+            resource_name: Some(user.username.clone()),
+            outcome: "success",
+            message: None,
+            metadata: None,
+        },
+    )
+    .await;
     Ok(Json(SessionResponse {
         user: PublicUser::from(user),
     }))
@@ -111,6 +125,20 @@ pub async fn register(
     active_invite.update(&state.db).await?;
 
     session.insert(SESSION_USER_ID, user_id).await?;
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&user),
+            action: "auth.register",
+            resource_type: "user",
+            resource_id: Some(user.id),
+            resource_name: Some(user.username.clone()),
+            outcome: "success",
+            message: None,
+            metadata: None,
+        },
+    )
+    .await;
     Ok(Json(SessionResponse {
         user: PublicUser::from(user),
     }))
@@ -129,14 +157,47 @@ pub async fn change_password(
         return Err(AppError::BadRequest("两次输入的新密码不一致".to_owned()));
     }
 
+    let actor = user.clone();
     let mut active: users::ActiveModel = user.into();
     active.password_hash = Set(password::hash_password(&form.new_password)?);
     active.update(&state.db).await?;
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&actor),
+            action: "auth.password_change",
+            resource_type: "user",
+            resource_id: Some(actor.id),
+            resource_name: Some(actor.username.clone()),
+            outcome: "success",
+            message: None,
+            metadata: None,
+        },
+    )
+    .await;
 
     Ok(Json(OkResponse { ok: true }))
 }
 
-pub async fn logout(session: Session) -> AppResult<impl IntoResponse> {
+pub async fn logout(
+    State(state): State<AppState>,
+    CurrentUser(user): CurrentUser,
+    session: Session,
+) -> AppResult<impl IntoResponse> {
     session.remove::<Uuid>(SESSION_USER_ID).await?;
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&user),
+            action: "auth.logout",
+            resource_type: "user",
+            resource_id: Some(user.id),
+            resource_name: Some(user.username.clone()),
+            outcome: "success",
+            message: None,
+            metadata: None,
+        },
+    )
+    .await;
     Ok(Json(OkResponse { ok: true }))
 }

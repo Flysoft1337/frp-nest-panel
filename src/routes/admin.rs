@@ -11,19 +11,20 @@ use sea_orm::{
     QueryOrder,
 };
 use serde::Deserialize;
+use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
     auth::AdminUser,
-    entities::{invite_codes, tunnels, users},
+    entities::{audit_logs, invite_codes, tunnels, users},
     error::{AppError, AppResult},
     routes::types::{
         AdminSummaryResponse, AdminTrafficSummaryResponse, AdminTunnelResponse,
-        AdminTunnelTrafficResponse, CaddyResponse, ConfigResponse, FrpcResponse,
+        AdminTunnelTrafficResponse, AuditLogResponse, CaddyResponse, ConfigResponse, FrpcResponse,
         FrpsStatusResponse, InviteResponse, OkResponse, PageResponse, PanelTlsResponse, PublicUser,
         TrafficHistoryPointResponse, TrafficHistoryResponse, TunnelResponse, UserRowResponse,
     },
-    services::{caddy, frpc, frps, invite, password, traffic, validation},
+    services::{audit, caddy, frpc, frps, invite, password, traffic, validation},
     state::AppState,
 };
 
@@ -47,6 +48,16 @@ pub struct UserQuotaForm {
 pub struct ListQuery {
     q: Option<String>,
     status: Option<String>,
+    page: Option<u64>,
+    page_size: Option<u64>,
+}
+
+#[derive(Deserialize, Default)]
+pub struct AuditLogQuery {
+    q: Option<String>,
+    action: Option<String>,
+    resource_type: Option<String>,
+    outcome: Option<String>,
     page: Option<u64>,
     page_size: Option<u64>,
 }
@@ -85,6 +96,66 @@ pub struct FrpsUpdateForm {
     enable_prometheus: bool,
     vhost_http_port: Option<u16>,
     vhost_https_port: Option<u16>,
+}
+
+pub async fn audit_log_list(
+    State(state): State<AppState>,
+    AdminUser(_user): AdminUser,
+    Query(query): Query<AuditLogQuery>,
+) -> AppResult<impl IntoResponse> {
+    let q = normalized_query(&query.q);
+    let action = normalized_filter(&query.action);
+    let resource_type = normalized_filter(&query.resource_type);
+    let outcome = normalized_filter(&query.outcome);
+    let items = audit_logs::Entity::find()
+        .order_by_desc(audit_logs::Column::CreatedAt)
+        .all(&state.db)
+        .await?
+        .into_iter()
+        .filter(|item| {
+            action
+                .as_ref()
+                .map(|value| item.action == value.as_str())
+                .unwrap_or(true)
+        })
+        .filter(|item| {
+            resource_type
+                .as_ref()
+                .map(|value| item.resource_type == value.as_str())
+                .unwrap_or(true)
+        })
+        .filter(|item| {
+            outcome
+                .as_ref()
+                .map(|value| item.outcome == value.as_str())
+                .unwrap_or(true)
+        })
+        .filter(|item| {
+            q.as_ref()
+                .map(|q| {
+                    item.actor_username
+                        .as_deref()
+                        .map(|value| value.to_ascii_lowercase().contains(q))
+                        .unwrap_or(false)
+                        || item.action.to_ascii_lowercase().contains(q)
+                        || item.resource_type.to_ascii_lowercase().contains(q)
+                        || item
+                            .resource_name
+                            .as_deref()
+                            .map(|value| value.to_ascii_lowercase().contains(q))
+                            .unwrap_or(false)
+                        || item
+                            .message
+                            .as_deref()
+                            .map(|value| value.to_ascii_lowercase().contains(q))
+                            .unwrap_or(false)
+                })
+                .unwrap_or(true)
+        })
+        .map(AuditLogResponse::from)
+        .collect::<Vec<_>>();
+
+    Ok(Json(audit_page_response(items, &query)))
 }
 
 pub async fn config(
@@ -197,12 +268,29 @@ pub async fn create_invite(
         .await?;
         created.push(InviteResponse::from(invite));
     }
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&user),
+            action: "admin.invite.create",
+            resource_type: "invite_code",
+            resource_id: None,
+            resource_name: None,
+            outcome: "success",
+            message: None,
+            metadata: audit::metadata(json!({
+                "count": form.count,
+                "expires_days": form.expires_days,
+            })),
+        },
+    )
+    .await;
     Ok(Json(created))
 }
 
 pub async fn delete_invite(
     State(state): State<AppState>,
-    AdminUser(_user): AdminUser,
+    AdminUser(user): AdminUser,
     Path(id): Path<Uuid>,
 ) -> AppResult<impl IntoResponse> {
     let Some(invite) = invite_codes::Entity::find_by_id(id).one(&state.db).await? else {
@@ -214,6 +302,20 @@ pub async fn delete_invite(
     invite_codes::Entity::delete_by_id(id)
         .exec(&state.db)
         .await?;
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&user),
+            action: "admin.invite.delete",
+            resource_type: "invite_code",
+            resource_id: Some(invite.id),
+            resource_name: Some(invite.code),
+            outcome: "success",
+            message: None,
+            metadata: None,
+        },
+    )
+    .await;
     Ok(Json(OkResponse { ok: true }))
 }
 
@@ -265,22 +367,24 @@ pub async fn disable_user(
     if id == admin.id {
         return Err(AppError::BadRequest("不能禁用自己".to_owned()));
     }
-    set_user_disabled(&state, id, true).await?;
+    let user = set_user_disabled(&state, id, true).await?;
+    audit_admin_user_action(&state, &admin, "admin.user.disable", &user, None).await;
     Ok(Json(OkResponse { ok: true }))
 }
 
 pub async fn enable_user(
     State(state): State<AppState>,
-    AdminUser(_admin): AdminUser,
+    AdminUser(admin): AdminUser,
     Path(id): Path<Uuid>,
 ) -> AppResult<impl IntoResponse> {
-    set_user_disabled(&state, id, false).await?;
+    let user = set_user_disabled(&state, id, false).await?;
+    audit_admin_user_action(&state, &admin, "admin.user.enable", &user, None).await;
     Ok(Json(OkResponse { ok: true }))
 }
 
 pub async fn reset_user_password(
     State(state): State<AppState>,
-    AdminUser(_admin): AdminUser,
+    AdminUser(admin): AdminUser,
     Path(id): Path<Uuid>,
     Json(form): Json<ResetPasswordForm>,
 ) -> AppResult<impl IntoResponse> {
@@ -288,15 +392,16 @@ pub async fn reset_user_password(
     let Some(user) = users::Entity::find_by_id(id).one(&state.db).await? else {
         return Err(AppError::NotFound);
     };
-    let mut active: users::ActiveModel = user.into();
+    let mut active: users::ActiveModel = user.clone().into();
     active.password_hash = Set(password::hash_password(&form.new_password)?);
     active.update(&state.db).await?;
+    audit_admin_user_action(&state, &admin, "admin.user.reset_password", &user, None).await;
     Ok(Json(OkResponse { ok: true }))
 }
 
 pub async fn update_user_quota(
     State(state): State<AppState>,
-    AdminUser(_admin): AdminUser,
+    AdminUser(admin): AdminUser,
     Path(id): Path<Uuid>,
     Json(form): Json<UserQuotaForm>,
 ) -> AppResult<impl IntoResponse> {
@@ -318,18 +423,43 @@ pub async fn update_user_quota(
     let Some(user) = users::Entity::find_by_id(id).one(&state.db).await? else {
         return Err(AppError::NotFound);
     };
-    let mut active: users::ActiveModel = user.into();
+    let mut active: users::ActiveModel = user.clone().into();
     active.max_tunnels = Set(form.max_tunnels);
     active.update(&state.db).await?;
+    audit_admin_user_action(
+        &state,
+        &admin,
+        "admin.user.update_quota",
+        &user,
+        audit::metadata(json!({ "max_tunnels": form.max_tunnels })),
+    )
+    .await;
     Ok(Json(OkResponse { ok: true }))
 }
 
 pub async fn delete_tunnel(
     State(state): State<AppState>,
-    AdminUser(_admin): AdminUser,
+    AdminUser(admin): AdminUser,
     Path(id): Path<Uuid>,
 ) -> AppResult<impl IntoResponse> {
+    let Some(tunnel) = tunnels::Entity::find_by_id(id).one(&state.db).await? else {
+        return Err(AppError::NotFound);
+    };
     tunnels::Entity::delete_by_id(id).exec(&state.db).await?;
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&admin),
+            action: "admin.tunnel.delete",
+            resource_type: "tunnel",
+            resource_id: Some(tunnel.id),
+            resource_name: Some(tunnel.name),
+            outcome: "success",
+            message: None,
+            metadata: None,
+        },
+    )
+    .await;
     Ok(Json(OkResponse { ok: true }))
 }
 
@@ -392,7 +522,7 @@ pub async fn all_tunnels(
 
 pub async fn preview_tunnel_frpc(
     State(state): State<AppState>,
-    AdminUser(_admin): AdminUser,
+    AdminUser(admin): AdminUser,
     Path(id): Path<Uuid>,
 ) -> AppResult<impl IntoResponse> {
     let Some(tunnel) = tunnels::Entity::find_by_id(id).one(&state.db).await? else {
@@ -407,6 +537,20 @@ pub async fn preview_tunnel_frpc(
 
     let frps = state.frps.read().await;
     let frpc_toml = frpc::render_frpc_toml(&frps, &user, &tunnel);
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&admin),
+            action: "admin.tunnel.frpc_preview",
+            resource_type: "tunnel",
+            resource_id: Some(tunnel.id),
+            resource_name: Some(tunnel.name.clone()),
+            outcome: "success",
+            message: None,
+            metadata: None,
+        },
+    )
+    .await;
     Ok(Json(FrpcResponse {
         tunnel: TunnelResponse::from(tunnel),
         frpc_toml,
@@ -535,7 +679,8 @@ pub async fn panel_tls_status(AdminUser(_user): AdminUser) -> AppResult<impl Int
 }
 
 pub async fn update_panel_tls(
-    AdminUser(_user): AdminUser,
+    State(state): State<AppState>,
+    AdminUser(user): AdminUser,
     Json(form): Json<PanelTlsForm>,
 ) -> AppResult<impl IntoResponse> {
     let config = crate::services::panel_tls::save_config(
@@ -548,6 +693,24 @@ pub async fn update_panel_tls(
             .filter(|value| !value.trim().is_empty()),
     )
     .await?;
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&user),
+            action: "admin.panel_tls.update",
+            resource_type: "panel_tls",
+            resource_id: None,
+            resource_name: Some(config.domain.clone()),
+            outcome: "success",
+            message: None,
+            metadata: audit::metadata(json!({
+                "enabled": config.enabled,
+                "bind": &config.bind,
+                "domain_count": config.domains.len(),
+            })),
+        },
+    )
+    .await;
     Ok(Json(PanelTlsResponse {
         enabled: config.enabled,
         bind: config.bind,
@@ -558,12 +721,29 @@ pub async fn update_panel_tls(
     }))
 }
 
-pub async fn restart_panel(AdminUser(_user): AdminUser) -> AppResult<impl IntoResponse> {
+pub async fn restart_panel(
+    State(state): State<AppState>,
+    AdminUser(user): AdminUser,
+) -> AppResult<impl IntoResponse> {
     tokio::spawn(async move {
         if let Err(error) = crate::services::panel_tls::restart_panel().await {
             tracing::error!(%error, "failed to restart panel");
         }
     });
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&user),
+            action: "admin.panel.restart",
+            resource_type: "panel",
+            resource_id: None,
+            resource_name: None,
+            outcome: "success",
+            message: None,
+            metadata: None,
+        },
+    )
+    .await;
     Ok(Json(OkResponse { ok: true }))
 }
 
@@ -577,18 +757,46 @@ pub async fn caddy_status(
 
 pub async fn update_caddy(
     State(state): State<AppState>,
-    AdminUser(_user): AdminUser,
+    AdminUser(user): AdminUser,
     Json(form): Json<CaddyForm>,
 ) -> AppResult<impl IntoResponse> {
     let config = caddy::save_config(form.enabled, form.domain, state.config.app_bind).await?;
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&user),
+            action: "admin.caddy.update",
+            resource_type: "caddy",
+            resource_id: None,
+            resource_name: Some(config.domain.clone()),
+            outcome: "success",
+            message: None,
+            metadata: audit::metadata(json!({ "enabled": config.enabled })),
+        },
+    )
+    .await;
     Ok(Json(caddy_response(config, state.config.app_bind).await))
 }
 
 pub async fn reload_caddy(
     State(state): State<AppState>,
-    AdminUser(_user): AdminUser,
+    AdminUser(user): AdminUser,
 ) -> AppResult<impl IntoResponse> {
     let config = caddy::reload_config(state.config.app_bind).await?;
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&user),
+            action: "admin.caddy.reload",
+            resource_type: "caddy",
+            resource_id: None,
+            resource_name: Some(config.domain.clone()),
+            outcome: "success",
+            message: None,
+            metadata: None,
+        },
+    )
+    .await;
     Ok(Json(caddy_response(config, state.config.app_bind).await))
 }
 
@@ -627,7 +835,7 @@ pub async fn frps_status(
 
 pub async fn update_frps(
     State(state): State<AppState>,
-    AdminUser(_user): AdminUser,
+    AdminUser(user): AdminUser,
     Json(form): Json<FrpsUpdateForm>,
 ) -> AppResult<impl IntoResponse> {
     if form.server_addr.trim().is_empty() {
@@ -674,11 +882,12 @@ pub async fn update_frps(
         ));
     }
 
+    let server_addr = form.server_addr.trim().to_owned();
     let mut current = state.frps.read().await.clone();
-    current.server_addr = form.server_addr.trim().to_owned();
+    current.server_addr = server_addr.clone();
     current.bind_port = form.bind_port;
     if !form.auth_token.is_empty() {
-        current.auth_token = form.auth_token;
+        current.auth_token = form.auth_token.clone();
     }
     current.remote_port_min = form.remote_port_min;
     current.remote_port_max = form.remote_port_max;
@@ -686,7 +895,7 @@ pub async fn update_frps(
     current.dashboard_port = form.dashboard_port;
     current.dashboard_user = form.dashboard_user.trim().to_owned();
     if !form.dashboard_password.is_empty() {
-        current.dashboard_password = form.dashboard_password;
+        current.dashboard_password = form.dashboard_password.clone();
     }
     current.enable_prometheus = form.enable_prometheus;
     current.vhost_http_port = form.vhost_http_port;
@@ -696,13 +905,35 @@ pub async fn update_frps(
         .await
         .map_err(|error| AppError::BadRequest(format!("保存 frps 配置失败: {error}")))?;
     *state.frps.write().await = current;
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&user),
+            action: "admin.frps.update",
+            resource_type: "frps",
+            resource_id: None,
+            resource_name: Some(server_addr),
+            outcome: "success",
+            message: None,
+            metadata: audit::metadata(json!({
+                "bind_port": form.bind_port,
+                "remote_port_min": form.remote_port_min,
+                "remote_port_max": form.remote_port_max,
+                "dashboard_configured": form.dashboard_port.is_some(),
+                "enable_prometheus": form.enable_prometheus,
+                "vhost_http_port": form.vhost_http_port,
+                "vhost_https_port": form.vhost_https_port,
+            })),
+        },
+    )
+    .await;
 
     Ok(Json(OkResponse { ok: true }))
 }
 
 pub async fn restart_frps(
     State(state): State<AppState>,
-    AdminUser(_user): AdminUser,
+    AdminUser(user): AdminUser,
 ) -> AppResult<impl IntoResponse> {
     if state
         .frps_restarting
@@ -719,18 +950,54 @@ pub async fn restart_frps(
         }
         restarting.store(false, Ordering::SeqCst);
     });
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(&user),
+            action: "admin.frps.restart",
+            resource_type: "frps",
+            resource_id: None,
+            resource_name: None,
+            outcome: "success",
+            message: None,
+            metadata: None,
+        },
+    )
+    .await;
 
     Ok(Json(OkResponse { ok: true }))
 }
 
-async fn set_user_disabled(state: &AppState, id: Uuid, disabled: bool) -> AppResult<()> {
+async fn set_user_disabled(state: &AppState, id: Uuid, disabled: bool) -> AppResult<users::Model> {
     let Some(user) = users::Entity::find_by_id(id).one(&state.db).await? else {
         return Err(AppError::NotFound);
     };
     let mut active: users::ActiveModel = user.into();
     active.disabled = Set(disabled);
-    active.update(&state.db).await?;
-    Ok(())
+    Ok(active.update(&state.db).await?)
+}
+
+async fn audit_admin_user_action(
+    state: &AppState,
+    admin: &users::Model,
+    action: &'static str,
+    user: &users::Model,
+    metadata: Option<serde_json::Value>,
+) {
+    audit::record(
+        &state.db,
+        audit::AuditEvent {
+            actor: Some(admin),
+            action,
+            resource_type: "user",
+            resource_id: Some(user.id),
+            resource_name: Some(user.username.clone()),
+            outcome: "success",
+            message: None,
+            metadata,
+        },
+    )
+    .await;
 }
 
 async fn caddy_response(
@@ -758,6 +1025,32 @@ fn normalized_query(q: &Option<String>) -> Option<String> {
     q.as_ref()
         .map(|value| value.trim().to_ascii_lowercase())
         .filter(|value| !value.is_empty())
+}
+
+fn normalized_filter(value: &Option<String>) -> Option<String> {
+    value
+        .as_ref()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+}
+
+fn audit_page_response<T>(items: Vec<T>, query: &AuditLogQuery) -> PageResponse<T> {
+    let total = items.len() as u64;
+    let page = query.page.unwrap_or(1).max(1);
+    let page_size = query.page_size.unwrap_or(20).clamp(1, 100);
+    let start = ((page - 1) * page_size) as usize;
+    let paged_items = items
+        .into_iter()
+        .skip(start)
+        .take(page_size as usize)
+        .collect();
+
+    PageResponse {
+        items: paged_items,
+        total,
+        page,
+        page_size,
+    }
 }
 
 fn page_response<T>(items: Vec<T>, query: &ListQuery) -> PageResponse<T> {
