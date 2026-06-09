@@ -203,11 +203,11 @@ onMounted(async () => {
     <p v-if="loadingTunnel" class="mb-4 text-sm text-slate-400">加载中</p>
     <form class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start" @submit.prevent="submit">
       <div class="grid gap-5">
-        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="grid gap-3 sm:grid-cols-2">
           <button
             v-for="item in protocolCards"
             :key="item.value"
-            class="min-h-28 rounded-3xl border p-4 text-left transition"
+            class="flex min-h-28 flex-col items-start justify-start rounded-3xl border p-4 text-left transition"
             :class="protocol === item.value ? 'border-cyan-300/40 bg-cyan-300/[0.08]' : 'border-white/10 bg-white/[0.03] hover:border-cyan-300/20'"
             type="button"
             @click="protocol = item.value"
