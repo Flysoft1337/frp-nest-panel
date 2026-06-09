@@ -442,15 +442,24 @@ pub async fn traffic_summary(
     let mut total_traffic_out = 0;
     let mut rows = Vec::new();
     for tunnel in tunnels::Entity::find().all(&state.db).await? {
+        let username = usernames
+            .get(&tunnel.user_id)
+            .cloned()
+            .unwrap_or_else(|| "未知用户".to_owned());
+        let user_key = (
+            tunnel.protocol.clone(),
+            format!("{}.{}", username, tunnel.name),
+        );
         let key = (tunnel.protocol.clone(), tunnel.name.clone());
-        let (traffic_in, traffic_out) = traffic.get(&key).copied().unwrap_or((0, 0));
+        let (traffic_in, traffic_out) = traffic
+            .get(&user_key)
+            .or_else(|| traffic.get(&key))
+            .copied()
+            .unwrap_or((0, 0));
         total_traffic_in += traffic_in;
         total_traffic_out += traffic_out;
         rows.push(AdminTunnelTrafficResponse {
-            username: usernames
-                .get(&tunnel.user_id)
-                .cloned()
-                .unwrap_or_else(|| "未知用户".to_owned()),
+            username,
             tunnel: TunnelResponse::from(tunnel),
             traffic_in,
             traffic_out,

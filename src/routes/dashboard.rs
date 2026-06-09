@@ -36,8 +36,16 @@ pub async fn tunnels(
     let tunnels = tunnels
         .into_iter()
         .map(|tunnel| {
+            let user_key = (
+                tunnel.protocol.clone(),
+                format!("{}.{}", user.username, tunnel.name),
+            );
             let key = (tunnel.protocol.clone(), tunnel.name.clone());
-            let (traffic_in, traffic_out) = traffic.get(&key).copied().unwrap_or((0, 0));
+            let (traffic_in, traffic_out) = traffic
+                .get(&user_key)
+                .or_else(|| traffic.get(&key))
+                .copied()
+                .unwrap_or((0, 0));
             TunnelWithTrafficResponse {
                 tunnel: TunnelResponse::from(tunnel),
                 traffic_available: snapshot.available,
