@@ -61,6 +61,10 @@ pub struct TunnelWithTrafficResponse {
     pub traffic_available: bool,
     pub traffic_in: u64,
     pub traffic_out: u64,
+    pub persistent_traffic_available: bool,
+    pub persistent_traffic_in: u64,
+    pub persistent_traffic_out: u64,
+    pub last_sampled_at: Option<DateTime<FixedOffset>>,
 }
 
 impl From<tunnels::Model> for TunnelResponse {
@@ -172,8 +176,12 @@ pub struct AdminSummaryResponse {
 #[derive(Serialize)]
 pub struct AdminTrafficSummaryResponse {
     pub available: bool,
+    pub persistent_available: bool,
     pub total_traffic_in: u64,
     pub total_traffic_out: u64,
+    pub persistent_total_traffic_in: u64,
+    pub persistent_total_traffic_out: u64,
+    pub last_sampled_at: Option<DateTime<FixedOffset>>,
     pub tunnels: Vec<AdminTunnelTrafficResponse>,
 }
 
@@ -183,6 +191,10 @@ pub struct AdminTunnelTrafficResponse {
     pub username: String,
     pub traffic_in: u64,
     pub traffic_out: u64,
+    pub persistent_traffic_available: bool,
+    pub persistent_traffic_in: u64,
+    pub persistent_traffic_out: u64,
+    pub last_sampled_at: Option<DateTime<FixedOffset>>,
 }
 
 #[derive(Serialize)]
@@ -204,6 +216,8 @@ pub struct FrpsStatusResponse {
     pub dashboard_user: String,
     pub dashboard_configured: bool,
     pub dashboard_available: bool,
+    pub enable_prometheus: bool,
+    pub prometheus_configured: bool,
     pub vhost_http_port: Option<u16>,
     pub vhost_https_port: Option<u16>,
 }

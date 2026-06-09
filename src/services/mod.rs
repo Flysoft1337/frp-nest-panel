@@ -6,4 +6,5 @@ pub mod invite;
 pub mod panel_tls;
 pub mod password;
 pub mod ports;
+pub mod traffic;
 pub mod validation;

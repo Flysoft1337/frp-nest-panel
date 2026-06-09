@@ -61,6 +61,8 @@ async fn main() -> anyhow::Result<()> {
         frps_restarting: Arc::new(AtomicBool::new(false)),
     };
 
+    tokio::spawn(crate::services::traffic::run_collector(state.clone()));
+
     let mut key_bytes = [0_u8; 64];
     for (index, byte) in config.session_secret.as_bytes().iter().take(64).enumerate() {
         key_bytes[index] = *byte;

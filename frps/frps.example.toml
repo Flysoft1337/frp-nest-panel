@@ -1,4 +1,5 @@
 bindPort = 7000
+enablePrometheus = true
 vhostHTTPPort = 8080
 vhostHTTPSPort = 8443
 

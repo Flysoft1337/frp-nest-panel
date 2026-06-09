@@ -23,6 +23,7 @@ pub struct FrpsRuntimeConfig {
     pub dashboard_port: Option<u16>,
     pub dashboard_user: String,
     pub dashboard_password: String,
+    pub enable_prometheus: bool,
     pub vhost_http_port: Option<u16>,
     pub vhost_https_port: Option<u16>,
 }
@@ -66,6 +67,8 @@ struct FrpsPanelToml<'a> {
     dashboard_user: &'a str,
     #[serde(rename = "dashboardPassword")]
     dashboard_password: &'a str,
+    #[serde(rename = "enablePrometheus")]
+    enable_prometheus: bool,
     #[serde(rename = "vhostHTTPPort")]
     vhost_http_port: Option<u16>,
     #[serde(rename = "vhostHTTPSPort")]
@@ -76,6 +79,8 @@ struct FrpsPanelToml<'a> {
 struct FrpsToml<'a> {
     #[serde(rename = "bindPort")]
     bind_port: u16,
+    #[serde(rename = "enablePrometheus")]
+    enable_prometheus: bool,
     #[serde(rename = "vhostHTTPPort", skip_serializing_if = "Option::is_none")]
     vhost_http_port: Option<u16>,
     #[serde(rename = "vhostHTTPSPort", skip_serializing_if = "Option::is_none")]
@@ -110,6 +115,7 @@ pub async fn load_runtime_config(config: &Config) -> Result<FrpsRuntimeConfig> {
         dashboard_port: None,
         dashboard_user: String::new(),
         dashboard_password: String::new(),
+        enable_prometheus: false,
         vhost_http_port: None,
         vhost_https_port: None,
     };
@@ -123,6 +129,11 @@ pub async fn load_runtime_config(config: &Config) -> Result<FrpsRuntimeConfig> {
 
         if let Some(bind_port) = value.get("bindPort").and_then(toml::Value::as_integer) {
             runtime.bind_port = u16::try_from(bind_port).context("frps bindPort is invalid")?;
+        }
+        if let Some(enable_prometheus) =
+            value.get("enablePrometheus").and_then(toml::Value::as_bool)
+        {
+            runtime.enable_prometheus = enable_prometheus;
         }
         if let Some(port) = value.get("vhostHTTPPort").and_then(toml::Value::as_integer) {
             runtime.vhost_http_port =
@@ -196,6 +207,11 @@ pub async fn load_runtime_config(config: &Config) -> Result<FrpsRuntimeConfig> {
         {
             runtime.dashboard_password = dashboard_password.to_owned();
         }
+        if let Some(enable_prometheus) =
+            value.get("enablePrometheus").and_then(toml::Value::as_bool)
+        {
+            runtime.enable_prometheus = enable_prometheus;
+        }
         if let Some(port) = value.get("vhostHTTPPort").and_then(toml::Value::as_integer) {
             runtime.vhost_http_port =
                 Some(u16::try_from(port).context("vhostHTTPPort is invalid")?);
@@ -229,6 +245,7 @@ pub async fn write_frps_config(config: &FrpsRuntimeConfig) -> Result<()> {
 
     let content = toml::to_string_pretty(&FrpsToml {
         bind_port: config.bind_port,
+        enable_prometheus: config.enable_prometheus,
         vhost_http_port: config.vhost_http_port,
         vhost_https_port: config.vhost_https_port,
         auth: FrpsTomlAuth {
@@ -263,6 +280,7 @@ pub async fn write_panel_config(config: &FrpsRuntimeConfig) -> Result<()> {
         dashboard_port: config.dashboard_port,
         dashboard_user: &config.dashboard_user,
         dashboard_password: &config.dashboard_password,
+        enable_prometheus: config.enable_prometheus,
         vhost_http_port: config.vhost_http_port,
         vhost_https_port: config.vhost_https_port,
     })?;

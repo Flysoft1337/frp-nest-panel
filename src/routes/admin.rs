@@ -77,6 +77,7 @@ pub struct FrpsUpdateForm {
     dashboard_port: Option<u16>,
     dashboard_user: String,
     dashboard_password: String,
+    enable_prometheus: bool,
     vhost_http_port: Option<u16>,
     vhost_https_port: Option<u16>,
 }
@@ -413,14 +414,6 @@ pub async fn traffic_summary(
 ) -> AppResult<impl IntoResponse> {
     let frps = state.frps.read().await.clone();
     let snapshot = frps::traffic_snapshot(&frps).await;
-    if !snapshot.available {
-        return Ok(Json(AdminTrafficSummaryResponse {
-            available: false,
-            total_traffic_in: 0,
-            total_traffic_out: 0,
-            tunnels: Vec::new(),
-        }));
-    }
 
     let users = users::Entity::find().all(&state.db).await?;
     let usernames = users
@@ -438,10 +431,19 @@ pub async fn traffic_summary(
         })
         .collect::<HashMap<_, _>>();
 
+    let tunnels = tunnels::Entity::find().all(&state.db).await?;
+    let persistent = crate::services::traffic::latest_by_tunnel(
+        &state.db,
+        &tunnels.iter().map(|tunnel| tunnel.id).collect::<Vec<_>>(),
+    )
+    .await?;
     let mut total_traffic_in = 0;
     let mut total_traffic_out = 0;
+    let mut persistent_total_traffic_in = 0;
+    let mut persistent_total_traffic_out = 0;
+    let mut last_sampled_at: Option<chrono::DateTime<chrono::FixedOffset>> = None;
     let mut rows = Vec::new();
-    for tunnel in tunnels::Entity::find().all(&state.db).await? {
+    for tunnel in tunnels {
         let username = usernames
             .get(&tunnel.user_id)
             .cloned()
@@ -458,18 +460,34 @@ pub async fn traffic_summary(
             .unwrap_or((0, 0));
         total_traffic_in += traffic_in;
         total_traffic_out += traffic_out;
+        let persistent_traffic = persistent.get(&tunnel.id);
+        if let Some(persistent_traffic) = persistent_traffic {
+            persistent_total_traffic_in += persistent_traffic.traffic_in;
+            persistent_total_traffic_out += persistent_traffic.traffic_out;
+            last_sampled_at = last_sampled_at
+                .map(|current| current.max(persistent_traffic.sampled_at))
+                .or(Some(persistent_traffic.sampled_at));
+        }
         rows.push(AdminTunnelTrafficResponse {
             username,
             tunnel: TunnelResponse::from(tunnel),
             traffic_in,
             traffic_out,
+            persistent_traffic_available: persistent_traffic.is_some(),
+            persistent_traffic_in: persistent_traffic.map(|item| item.traffic_in).unwrap_or(0),
+            persistent_traffic_out: persistent_traffic.map(|item| item.traffic_out).unwrap_or(0),
+            last_sampled_at: persistent_traffic.map(|item| item.sampled_at),
         });
     }
 
     Ok(Json(AdminTrafficSummaryResponse {
-        available: true,
+        available: snapshot.available,
+        persistent_available: last_sampled_at.is_some(),
         total_traffic_in,
         total_traffic_out,
+        persistent_total_traffic_in,
+        persistent_total_traffic_out,
+        last_sampled_at,
         tunnels: rows,
     }))
 }
@@ -572,6 +590,8 @@ pub async fn frps_status(
         dashboard_user: frps.dashboard_user,
         dashboard_configured: frps.dashboard_port.is_some(),
         dashboard_available,
+        enable_prometheus: frps.enable_prometheus,
+        prometheus_configured: frps.dashboard_port.is_some() && frps.enable_prometheus,
         vhost_http_port: frps.vhost_http_port,
         vhost_https_port: frps.vhost_https_port,
     }))
@@ -640,6 +660,7 @@ pub async fn update_frps(
     if !form.dashboard_password.is_empty() {
         current.dashboard_password = form.dashboard_password;
     }
+    current.enable_prometheus = form.enable_prometheus;
     current.vhost_http_port = form.vhost_http_port;
     current.vhost_https_port = form.vhost_https_port;
 

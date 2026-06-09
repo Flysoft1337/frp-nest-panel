@@ -21,6 +21,11 @@ function formatBytes(value: number) {
   return `${(value / 1024 / 1024 / 1024).toFixed(1)} GiB`
 }
 
+function formatDateTime(value: string | null) {
+  if (!value) return ''
+  return new Date(value).toLocaleString()
+}
+
 onMounted(async () => {
   try {
     const [configData, summaryData, trafficData] = await Promise.all([getConfig(), getAdminSummary(), getAdminTrafficSummary()])
@@ -53,19 +58,25 @@ onMounted(async () => {
       <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 class="text-xl font-bold text-white">总流量</h2>
-          <p class="text-sm text-slate-400">{{ traffic.available ? '来自 frps dashboard 的真实数据。' : 'frps dashboard 数据源未配置或不可用。' }}</p>
+          <p class="text-sm text-slate-400">
+            <template v-if="traffic.persistent_available">来自 Prometheus 长期统计。最近采样 {{ formatDateTime(traffic.last_sampled_at) }}。</template>
+            <template v-else-if="traffic.available">仅 frps dashboard 实时数据可用，长期统计等待采样。</template>
+            <template v-else>frps dashboard / Prometheus 数据源未配置或不可用。</template>
+          </p>
         </div>
-        <StatusPill :tone="traffic.available ? 'success' : 'default'">{{ traffic.available ? '数据可用' : '未接入' }}</StatusPill>
+        <StatusPill :tone="traffic.persistent_available ? 'success' : traffic.available ? 'success' : 'default'">{{ traffic.persistent_available ? '长期统计可用' : traffic.available ? '实时可用' : '未接入' }}</StatusPill>
       </div>
     </div>
     <div class="grid gap-3 p-6 text-sm md:grid-cols-2">
       <div class="rounded-3xl border border-white/10 bg-slate-950/30 px-5 py-4">
-        <span class="text-slate-400">入站</span>
-        <div class="mt-2 font-mono text-2xl font-black text-cyan-100">{{ formatBytes(traffic.total_traffic_in) }}</div>
+        <span class="text-slate-400">长期入站</span>
+        <div class="mt-2 font-mono text-2xl font-black text-cyan-100">{{ formatBytes(traffic.persistent_total_traffic_in) }}</div>
+        <div class="mt-2 text-xs text-slate-500">实时 {{ formatBytes(traffic.total_traffic_in) }}</div>
       </div>
       <div class="rounded-3xl border border-white/10 bg-slate-950/30 px-5 py-4">
-        <span class="text-slate-400">出站</span>
-        <div class="mt-2 font-mono text-2xl font-black text-cyan-100">{{ formatBytes(traffic.total_traffic_out) }}</div>
+        <span class="text-slate-400">长期出站</span>
+        <div class="mt-2 font-mono text-2xl font-black text-cyan-100">{{ formatBytes(traffic.persistent_total_traffic_out) }}</div>
+        <div class="mt-2 text-xs text-slate-500">实时 {{ formatBytes(traffic.total_traffic_out) }}</div>
       </div>
     </div>
   </section>

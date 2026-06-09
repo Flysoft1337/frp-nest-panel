@@ -21,6 +21,11 @@ pub async fn tunnels(
         .order_by_asc(tunnels::Column::CreatedAt)
         .all(&state.db)
         .await?;
+    let persistent = crate::services::traffic::latest_by_tunnel(
+        &state.db,
+        &tunnels.iter().map(|tunnel| tunnel.id).collect::<Vec<_>>(),
+    )
+    .await?;
     let frps_config = state.frps.read().await.clone();
     let snapshot = frps::traffic_snapshot(&frps_config).await;
     let traffic = snapshot
@@ -46,11 +51,18 @@ pub async fn tunnels(
                 .or_else(|| traffic.get(&key))
                 .copied()
                 .unwrap_or((0, 0));
+            let persistent_traffic = persistent.get(&tunnel.id);
             TunnelWithTrafficResponse {
                 tunnel: TunnelResponse::from(tunnel),
                 traffic_available: snapshot.available,
                 traffic_in,
                 traffic_out,
+                persistent_traffic_available: persistent_traffic.is_some(),
+                persistent_traffic_in: persistent_traffic.map(|item| item.traffic_in).unwrap_or(0),
+                persistent_traffic_out: persistent_traffic
+                    .map(|item| item.traffic_out)
+                    .unwrap_or(0),
+                last_sampled_at: persistent_traffic.map(|item| item.sampled_at),
             }
         })
         .collect::<Vec<_>>();

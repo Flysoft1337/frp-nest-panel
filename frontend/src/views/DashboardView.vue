@@ -24,6 +24,11 @@ function customDomains(value: string | null) {
   return value?.split(',').map((domain) => domain.trim()).filter(Boolean) || []
 }
 
+function formatDateTime(value: string | null) {
+  if (!value) return ''
+  return new Date(value).toLocaleString()
+}
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -96,9 +101,12 @@ onMounted(load)
                 <h2 class="truncate text-lg font-black text-white">{{ row.tunnel.name }}</h2>
                 <StatusPill>{{ row.tunnel.protocol }}</StatusPill>
               </div>
-              <div class="mt-2 text-sm text-slate-400">
-                <code v-if="row.traffic_available" class="text-cyan-100">↓ {{ formatBytes(row.traffic_in) }} / ↑ {{ formatBytes(row.traffic_out) }}</code>
-                <span v-else>流量暂无数据</span>
+              <div class="mt-2 grid gap-1 text-sm text-slate-400">
+                <code v-if="row.persistent_traffic_available" class="text-cyan-100">长期 ↓ {{ formatBytes(row.persistent_traffic_in) }} / ↑ {{ formatBytes(row.persistent_traffic_out) }}</code>
+                <span v-else>长期统计等待采样</span>
+                <span v-if="row.last_sampled_at" class="text-xs text-slate-500">最近采样 {{ formatDateTime(row.last_sampled_at) }}</span>
+                <code v-if="row.traffic_available" class="text-slate-300">实时 ↓ {{ formatBytes(row.traffic_in) }} / ↑ {{ formatBytes(row.traffic_out) }}</code>
+                <span v-else class="text-xs text-slate-500">实时数据源未接入</span>
               </div>
             </div>
             <div class="flex flex-wrap gap-2">

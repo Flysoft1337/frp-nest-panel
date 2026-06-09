@@ -30,6 +30,10 @@ export interface TunnelWithTraffic {
   traffic_available: boolean
   traffic_in: number
   traffic_out: number
+  persistent_traffic_available: boolean
+  persistent_traffic_in: number
+  persistent_traffic_out: number
+  last_sampled_at: string | null
 }
 
 export interface FrpcResponse {
@@ -60,8 +64,12 @@ export interface AdminTunnelRow {
 
 export interface AdminTrafficSummary {
   available: boolean
+  persistent_available: boolean
   total_traffic_in: number
   total_traffic_out: number
+  persistent_total_traffic_in: number
+  persistent_total_traffic_out: number
+  last_sampled_at: string | null
   tunnels: AdminTunnelTraffic[]
 }
 
@@ -70,6 +78,10 @@ export interface AdminTunnelTraffic {
   username: string
   traffic_in: number
   traffic_out: number
+  persistent_traffic_available: boolean
+  persistent_traffic_in: number
+  persistent_traffic_out: number
+  last_sampled_at: string | null
 }
 
 export interface PageResponse<T> {
@@ -114,6 +126,8 @@ export interface FrpsStatus {
   dashboard_user: string
   dashboard_configured: boolean
   dashboard_available: boolean
+  enable_prometheus: boolean
+  prometheus_configured: boolean
   vhost_http_port: number | null
   vhost_https_port: number | null
 }
@@ -128,6 +142,7 @@ export interface FrpsUpdate {
   dashboard_port: number | null
   dashboard_user: string
   dashboard_password: string
+  enable_prometheus: boolean
   vhost_http_port: number | null
   vhost_https_port: number | null
 }

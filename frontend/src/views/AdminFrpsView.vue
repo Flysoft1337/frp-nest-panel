@@ -25,6 +25,7 @@ const form = reactive({
   dashboard_port: null as number | null,
   dashboard_user: '',
   dashboard_password: '',
+  enable_prometheus: false,
   vhost_http_port: null as number | null,
   vhost_https_port: null as number | null,
 })
@@ -62,6 +63,7 @@ async function load() {
   form.dashboard_port = data.dashboard_port
   form.dashboard_user = data.dashboard_user
   form.dashboard_password = ''
+  form.enable_prometheus = data.enable_prometheus
   form.vhost_http_port = data.vhost_http_port
   form.vhost_https_port = data.vhost_https_port
   const tls = await getPanelTls()
@@ -234,14 +236,33 @@ onMounted(async () => {
 
       <section class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
         <div class="mb-4 flex flex-col gap-1">
-          <h2 class="text-lg font-bold text-white">Dashboard 流量数据源</h2>
-          <p class="text-sm text-slate-400">启用后 frps 会写入 webServer 配置，重启 frps 后流量统计才会可用。</p>
+          <h2 class="text-lg font-bold text-white">Dashboard / Prometheus 数据源</h2>
+          <p class="text-sm text-slate-400">Dashboard 提供实时状态；Prometheus 用于长期流量采样。保存并重启 frps 后生效。</p>
+        </div>
+        <div v-if="status" class="mb-4 rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
+          当前 Prometheus：<span :class="status.prometheus_configured ? 'text-emerald-100' : 'text-slate-400'">{{ status.prometheus_configured ? '已配置' : '未配置' }}</span>
         </div>
         <div class="grid items-start gap-4 md:grid-cols-2">
           <FormField label="Dashboard 地址"><input v-model="form.dashboard_addr" placeholder="127.0.0.1" /></FormField>
           <FormField label="Dashboard 端口"><input v-model="form.dashboard_port" max="65535" min="1" placeholder="留空关闭" type="number" /></FormField>
           <FormField label="Dashboard 用户"><input v-model="form.dashboard_user" autocomplete="username" placeholder="admin" /></FormField>
           <FormField label="Dashboard 密码" note="留空表示不修改"><input v-model="form.dashboard_password" autocomplete="new-password" placeholder="留空表示不修改" type="password" /></FormField>
+          <FormField label="启用 Prometheus 长期统计"><SelectField v-model="form.enable_prometheus" :options="panelTlsEnabledOptions" /></FormField>
+        </div>
+      </section>
+
+      <section class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+        <div class="mb-4 flex flex-col gap-1">
+          <h2 class="text-lg font-bold text-white">frps 版本差异</h2>
+          <p class="text-sm text-slate-400">当前面板固定使用 0.69.1，初始框架使用 0.62.1。</p>
+        </div>
+        <div class="grid gap-3 text-sm text-slate-300 md:grid-cols-2 xl:grid-cols-3">
+          <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-3"><span class="text-cyan-100">0.65.0</span> 新增更细的 Prometheus proxy 指标。</div>
+          <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-3"><span class="text-cyan-100">0.67.0</span> 新增 clientID 和客户端连接状态。</div>
+          <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-3"><span class="text-cyan-100">0.68.0</span> 新增 frpc built-in store 和管理 API。</div>
+          <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-3"><span class="text-cyan-100">0.68.1</span> 修复 HTTP proxy auth bypass。</div>
+          <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-3"><span class="text-cyan-100">0.69.0</span> 新增 transport.wireProtocol v1/v2。</div>
+          <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-3"><span class="text-cyan-100">0.69.1</span> v2 扩展到 UDP/SUDP payload。</div>
         </div>
       </section>
 
